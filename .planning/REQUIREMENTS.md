@@ -59,7 +59,7 @@ Requirements for internal demo release. Each maps to roadmap phases.
 
 ### Branding
 
-- [ ] **BRND-01**: Taskpane displays "Summit VI" branding (name, minimal styling)
+- [x] **BRND-01**: Taskpane displays "Summit VI" branding (name, minimal styling)
 
 ## v2 Requirements
 
@@ -101,7 +101,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | TASK-01 | Phase 4 | Pending |
-| TASK-02 | Phase 3 | Pending |
+| TASK-02 | Phase 1, Phase 3 | Complete (Phase 1) |
 | TASK-03 | Phase 3 | Pending |
 | TASK-04 | Phase 6 | Pending |
 | CUBE-01 | Phase 3 | Pending |
@@ -126,7 +126,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LYOT-03 | Phase 2 | Pending |
 | MLTS-01 | Phase 6 | Pending |
 | MLTS-02 | Phase 6 | Pending |
-| BRND-01 | Phase 1 | Pending |
+| BRND-01 | Phase 1 | Complete |
 
 **Coverage:**
 - v1 requirements: 27 total
