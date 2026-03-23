@@ -100,39 +100,39 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TASK-01 | — | Pending |
-| TASK-02 | — | Pending |
-| TASK-03 | — | Pending |
-| TASK-04 | — | Pending |
-| CUBE-01 | — | Pending |
-| CUBE-02 | — | Pending |
-| CUBE-03 | — | Pending |
-| CUBE-04 | — | Pending |
-| SCHM-01 | — | Pending |
-| SCHM-02 | — | Pending |
-| SCHM-03 | — | Pending |
-| TEXT-01 | — | Pending |
-| TEXT-02 | — | Pending |
-| TEXT-03 | — | Pending |
-| TEXT-04 | — | Pending |
-| CHRT-01 | — | Pending |
-| CHRT-02 | — | Pending |
-| CHRT-03 | — | Pending |
-| CHRT-04 | — | Pending |
-| TABL-01 | — | Pending |
-| TABL-02 | — | Pending |
-| LYOT-01 | — | Pending |
-| LYOT-02 | — | Pending |
-| LYOT-03 | — | Pending |
-| MLTS-01 | — | Pending |
-| MLTS-02 | — | Pending |
-| BRND-01 | — | Pending |
+| TASK-01 | Phase 4 | Pending |
+| TASK-02 | Phase 3 | Pending |
+| TASK-03 | Phase 3 | Pending |
+| TASK-04 | Phase 6 | Pending |
+| CUBE-01 | Phase 3 | Pending |
+| CUBE-02 | Phase 3 | Pending |
+| CUBE-03 | Phase 6 | Pending |
+| CUBE-04 | Phase 6 | Pending |
+| SCHM-01 | Phase 4 | Pending |
+| SCHM-02 | Phase 4 | Pending |
+| SCHM-03 | Phase 4 | Pending |
+| TEXT-01 | Phase 2 | Pending |
+| TEXT-02 | Phase 2 | Pending |
+| TEXT-03 | Phase 2 | Pending |
+| TEXT-04 | Phase 2 | Pending |
+| CHRT-01 | Phase 5 | Pending |
+| CHRT-02 | Phase 5 | Pending |
+| CHRT-03 | Phase 5 | Pending |
+| CHRT-04 | Phase 5 | Pending |
+| TABL-01 | Phase 2 | Pending |
+| TABL-02 | Phase 2 | Pending |
+| LYOT-01 | Phase 4 | Pending |
+| LYOT-02 | Phase 2 | Pending |
+| LYOT-03 | Phase 2 | Pending |
+| MLTS-01 | Phase 6 | Pending |
+| MLTS-02 | Phase 6 | Pending |
+| BRND-01 | Phase 1 | Pending |
 
 **Coverage:**
 - v1 requirements: 27 total
-- Mapped to phases: 0
-- Unmapped: 27 ⚠️
+- Mapped to phases: 27
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-23*
-*Last updated: 2026-03-23 after initial definition*
+*Last updated: 2026-03-23 after roadmap creation — all 27 requirements mapped*
