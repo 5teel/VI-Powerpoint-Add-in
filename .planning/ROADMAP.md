@@ -32,8 +32,8 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. The project compiles with TypeScript strict mode and runs on the local HTTPS dev server
 **Plans**: 2 plans
 Plans:
-- [ ] 01-01-PLAN.md -- Scaffold Office add-in, configure dependencies, set up .env and logo asset
-- [ ] 01-02-PLAN.md -- Build branded UI shell with chat layout and Cube AI connectivity test
+- [x] 01-01-PLAN.md -- Scaffold Office add-in, configure dependencies, set up .env and logo asset
+- [x] 01-02-PLAN.md -- Build branded UI shell with chat layout and Cube AI connectivity test
 
 ### Phase 2: Slide Primitives
 **Goal**: Every Office.js rendering capability required by the project is individually proven to work in the target environment
