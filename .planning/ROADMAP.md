@@ -44,7 +44,11 @@ Plans:
   2. A data table is inserted on a slide with headers, data rows, borders, alignment, and number formatting
   3. A placeholder image is inserted into a slide shape via ShapeFill.setImage() occupying the correct layout region
   4. Multiple layout templates (text-only, chart+text, table+text) produce non-overlapping elements in the correct positions
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 02-01-PLAN.md -- Types, layout constants, number formatter, and text/callout renderers
+- [ ] 02-02-PLAN.md -- Table renderer, chart placeholder, layout engine, and slide renderer orchestrator
+- [ ] 02-03-PLAN.md -- Test UI panel with four template buttons and human verification in PowerPoint
 
 ### Phase 3: Cube AI Integration
 **Goal**: The add-in reliably streams, buffers, and parses NDJSON responses from Cube AI with correct error handling
@@ -99,8 +103,8 @@ Note: Phase 2 and Phase 3 have no dependency on each other — both depend only 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/TBD | Not started | - |
-| 2. Slide Primitives | 0/TBD | Not started | - |
+| 1. Foundation | 2/2 | Complete | 2026-03-23 |
+| 2. Slide Primitives | 0/3 | Planned | - |
 | 3. Cube AI Integration | 0/TBD | Not started | - |
 | 4. Schema and End-to-End Pipeline | 0/TBD | Not started | - |
 | 5. Chart Rendering | 0/TBD | Not started | - |
