@@ -51,12 +51,12 @@ Exceptions: Touch target minimum 44px for the send button (accessibility require
 | Body | 14px | 400 (regular) | 1.43 (20px) | typographyStyles.body1 |
 | Label | 12px | 600 (semibold) | 1.33 (16px) | typographyStyles.caption1Strong |
 | Heading | 16px | 600 (semibold) | 1.375 (22px) | typographyStyles.subtitle2 |
-| Brand Title | 14px | 700 (bold) | 1.43 (20px) | Custom (header brand name) |
+| Brand Title | 14px | 600 (semibold) | 1.43 (20px) | typographyStyles.body1Strong |
 
 **Constraints:**
 - 3 sizes only: 12px, 14px, 16px. No larger sizes needed in a 320px-wide taskpane.
-- 2 weights: regular (400) and semibold (600). Bold (700) used only for the brand name in the header.
-- All typography uses Fluent UI v9 `typographyStyles` presets except the brand title.
+- 2 weights only: regular (400) and semibold (600). No exceptions.
+- All typography uses Fluent UI v9 `typographyStyles` presets. Brand title uses `body1Strong` (14px semibold).
 
 ---
 
@@ -92,6 +92,8 @@ Exceptions: Touch target minimum 44px for the send button (accessibility require
 
 The taskpane uses a single-column vertical layout with three regions. This maps to decision D-01 (chat-style layout).
 
+**Primary focal point:** The input area (text input + send button) at the bottom of the taskpane. This is where the user's attention starts and returns after each interaction. The response area above serves as a feedback surface that draws the eye only when content appears.
+
 ```
 +---------------------------+
 |  HEADER (fixed, 48px)     |
@@ -105,7 +107,7 @@ The taskpane uses a single-column vertical layout with three regions. This maps 
 |  - Empty state            |
 |                           |
 +---------------------------+
-|  INPUT AREA (fixed)       |
+|  INPUT AREA (fixed)       |  <-- primary focal point
 |  [Text input] [Send btn]  |
 +---------------------------+
 ```
@@ -140,7 +142,7 @@ Phase 1 uses these Fluent UI v9 components:
 
 | Element | Copy |
 |---------|------|
-| Primary CTA | "Send" (button label on the input row) |
+| Primary CTA | "Send Query" (button label on the input row) |
 | Empty state heading | "Test Cube AI Connection" |
 | Empty state body | "Type a question below to verify the API connection is working." |
 | Loading state | "Connecting to Cube AI..." (shown with Spinner) |
@@ -162,7 +164,7 @@ Phase 1 uses these Fluent UI v9 components:
 
 | State | Visual | Behavior |
 |-------|--------|----------|
-| Default | `#0F1330` background, white text "Send" | Clickable |
+| Default | `#0F1330` background, white text "Send Query" | Clickable |
 | Hover | `#1A2040` background (10% lighter) | Cursor: pointer |
 | Disabled | Fluent UI disabled tokens (grayed out) | During API call, while input is empty |
 | Loading | Hidden; replaced by Spinner in the response area | Button remains enabled but shows spinner above |
