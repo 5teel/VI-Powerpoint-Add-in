@@ -17,12 +17,12 @@ const Header: React.FC = () => {
       }}
     >
       <img
-        src="../../assets/summit-logo.png"
+        src="/assets/summit-logo.png"
         alt="Summit VI logo"
-        style={{ height: "24px", width: "auto" }}
+        style={{ height: "24px", width: "auto", filter: "brightness(0) invert(1)" }}
       />
       <Text weight="semibold" style={{ color: "#FFFFFF", fontSize: "14px", lineHeight: "20px" }}>
-        Summit VI
+         - VI for Powerpoint
       </Text>
     </div>
   );

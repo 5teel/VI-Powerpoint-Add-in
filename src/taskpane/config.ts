@@ -5,7 +5,7 @@
 export const CUBEAI_CONFIG = {
   baseUrl:
     "https://ai.gcp-us-central1.cubecloud.dev/api/v1/public/summitinsights/agents/11/chat/stream-chat-state",
-  apiKey: "YOUR_API_KEY_HERE", // Replace with actual key before testing
-  externalId: "user@summit.com",
+  apiKey: "sk-c3VtbWl0aW5zaWdodHM6ZjAxZWIzMGZkZWIyYjFmNWE4YmRjOWMwYWNlZjNiZTU1MWIxNDhlNmRiMGJiN2Y5Nzk1YzI2ODk3ZjBjZDE0YQ==", // Replace with actual key before testing
+  externalId: "simon.scott@summitinsights.com",
   timeoutMs: 180000,
 };
