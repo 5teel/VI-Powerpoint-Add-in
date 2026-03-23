@@ -30,7 +30,10 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. A test call to the Cube AI Chat API completes successfully (no CORS errors) and the raw response appears in the taskpane
   3. The add-in loads via sideload manifest without Office Store submission
   4. The project compiles with TypeScript strict mode and runs on the local HTTPS dev server
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 01-01-PLAN.md -- Scaffold Office add-in, configure dependencies, set up .env and logo asset
+- [ ] 01-02-PLAN.md -- Build branded UI shell with chat layout and Cube AI connectivity test
 
 ### Phase 2: Slide Primitives
 **Goal**: Every Office.js rendering capability required by the project is individually proven to work in the target environment
