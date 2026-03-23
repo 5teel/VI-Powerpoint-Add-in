@@ -70,12 +70,16 @@ export async function addSlideAtCurrentPosition(
         }
 
         // Insert after the selected slide
-        slides.add({ index: selectedIndex + 1 });
+        slides.add({ index: selectedIndex + 1 } as any);
         await context.sync();
 
         const newSlide = slides.getItemAt(selectedIndex + 1);
         newSlide.load("id");
         await context.sync();
+
+        // Remove default placeholder shapes
+        await clearDefaultShapes(context, newSlide);
+
         return newSlide;
       }
     } catch {
@@ -94,5 +98,28 @@ export async function addSlideAtCurrentPosition(
   newSlide.load("id");
   await context.sync();
 
+  // Remove default placeholder shapes (title, subtitle) so we start with a blank slide
+  await clearDefaultShapes(context, newSlide);
+
   return newSlide;
+}
+
+/**
+ * Removes all default placeholder shapes from a newly created slide.
+ * PowerPoint adds "Click to add title" and "Click to add subtitle" shapes
+ * by default — we need a blank canvas for our custom rendering.
+ */
+async function clearDefaultShapes(
+  context: PowerPoint.RequestContext,
+  slide: PowerPoint.Slide
+): Promise<void> {
+  const shapes = slide.shapes;
+  shapes.load("items");
+  await context.sync();
+
+  // Delete all existing shapes (they are default placeholders)
+  for (let i = shapes.items.length - 1; i >= 0; i--) {
+    shapes.items[i].delete();
+  }
+  await context.sync();
 }
