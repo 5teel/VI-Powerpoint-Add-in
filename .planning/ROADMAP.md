@@ -46,9 +46,9 @@ Plans:
   4. Multiple layout templates (text-only, chart+text, table+text) produce non-overlapping elements in the correct positions
 **Plans**: 3 plans
 Plans:
-- [ ] 02-01-PLAN.md -- Types, layout constants, number formatter, and text/callout renderers
-- [ ] 02-02-PLAN.md -- Table renderer, chart placeholder, layout engine, and slide renderer orchestrator
-- [ ] 02-03-PLAN.md -- Test UI panel with four template buttons and human verification in PowerPoint
+- [x] 02-01-PLAN.md -- Types, layout constants, number formatter, and text/callout renderers
+- [x] 02-02-PLAN.md -- Table renderer, chart placeholder, layout engine, and slide renderer orchestrator
+- [x] 02-03-PLAN.md -- Test UI panel with four template buttons and human verification in PowerPoint
 
 ### Phase 3: Cube AI Integration
 **Goal**: The add-in reliably streams, buffers, and parses NDJSON responses from Cube AI with correct error handling
@@ -104,7 +104,7 @@ Note: Phase 2 and Phase 3 have no dependency on each other — both depend only 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 2/2 | Complete | 2026-03-23 |
-| 2. Slide Primitives | 0/3 | Planned | - |
+| 2. Slide Primitives | 1/3 | In Progress|  |
 | 3. Cube AI Integration | 0/TBD | Not started | - |
 | 4. Schema and End-to-End Pipeline | 0/TBD | Not started | - |
 | 5. Chart Rendering | 0/TBD | Not started | - |
