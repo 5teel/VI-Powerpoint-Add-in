@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+lib/
+
+# Environment secrets
+.env
+
+# Dev certificates
+*.pem
+*.key
+*.cert
+*.crt
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
