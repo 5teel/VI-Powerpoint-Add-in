@@ -39,10 +39,10 @@ All values in points. Based on a 12-point base unit for slide content (not 8px w
 | region-gap | 24 pt | Gap between major layout regions (e.g., text column and chart area) |
 | element-gap | 16 pt | Gap between elements within a region (e.g., title to body text) |
 | inner-padding | 12 pt | Padding inside bordered elements (callout box, table cells) |
-| bullet-indent | 18 pt | Left indent for bullet list items |
-| table-cell-pad | 6 pt | Internal cell padding for table cells |
+| bullet-indent | 18 pt | Left indent for bullet list items. Note: 18pt is 1.5x the 12pt base unit; not a multiple of 4 but a standard half-increment in the slide point grid. |
+| table-cell-pad | 6 pt | Internal cell padding for table cells. Note: 6pt is 0.5x the 12pt base unit; not a multiple of 4 but a standard half-increment in the slide point grid. |
 
-Exceptions: None. All slide content uses these values.
+Exceptions: bullet-indent (18pt) and table-cell-pad (6pt) deviate from multiples-of-4 as documented above. Both are half-base and 1.5x-base multiples of the 12pt slide unit, which is the natural grid for point-based slide layout.
 
 ---
 
@@ -53,15 +53,13 @@ Font: **Calibri** (PowerPoint default, universally available, professional data 
 | Role | Size | Weight | Line Height | Usage |
 |------|------|--------|-------------|-------|
 | Slide Title | 28 pt | Bold (700) | 1.2 (34 pt) | Main slide heading — one per slide |
+| Key Insight | 22 pt | Bold (700) | 1.3 (29 pt) | Text inside the callout box (TEXT-03) |
 | Body Text | 18 pt | Regular (400) | 1.5 (27 pt) | Bullet points, paragraphs, summaries |
-| Key Insight | 22 pt | Semibold (600) | 1.3 (29 pt) | Text inside the callout box (TEXT-03) |
-| Table Header | 14 pt | Bold (700) | 1.2 (17 pt) | Table column headers |
-| Table Body | 12 pt | Regular (400) | 1.3 (16 pt) | Table data cells |
-| Caption / Source | 10 pt | Regular (400) | 1.3 (13 pt) | Attribution, footnotes (future use) |
+| Table / Detail | 14 pt | Regular (400) for data, Bold (700) for headers | 1.2 (17 pt) | Table column headers (bold), table data cells (regular), chart placeholder label |
 
 **Constraints:**
-- 4 active sizes this phase: 28, 22, 18, 14/12 (title, insight, body, table).
-- 2 weights: Regular (400) and Bold (700). Semibold (600) used only for key insight text.
+- Exactly 4 sizes this phase: 28, 22, 18, 14.
+- Exactly 2 weights: Regular (400) and Bold (700). No other weights.
 - All text uses Calibri. No font mixing.
 - Title text: left-aligned. Body text: left-aligned. Table headers: center-aligned. Table data: right-aligned for numbers, left-aligned for text.
 
@@ -90,7 +88,7 @@ Font: **Calibri** (PowerPoint default, universally available, professional data 
 **60/30/10 Split (applied to slide surface area):**
 - 60% Dominant: #FFFFFF slide background + white table rows
 - 30% Secondary: #F2F4F8 alternating table rows + #EBF0FA callout box
-- 10% Accent: #0F1330 title text + table headers + callout border
+- 10% Accent: #0F1330 (Summit Navy) for title text, table headers, callout border; #2563EB (Bright Blue) as spot accent within this tier for chart placeholder borders and emphasis numbers
 
 ---
 
@@ -219,7 +217,7 @@ Chart + table + text on one dense slide. For comprehensive data views.
 | Table | 492 | 100 | 432 | 280 |
 | Callout box | 36 | 404 | 888 | 100 |
 
-**Table constraint for Template 4:** Maximum 5 columns and 6 data rows. Font reduced to 10pt body / 11pt header for compact fit.
+**Table constraint for Template 4:** Maximum 5 columns and 6 data rows. Uses the same 14pt size as all other tables (header bold, body regular).
 
 ---
 
@@ -236,7 +234,7 @@ The callout box is the most distinctive visual element — it must be unmissable
 | Left border | 3 pt, #0F1330 (Summit Navy) — achieved via a thin rectangle shape overlaid at the left edge |
 | Other borders | None visible (fill blends with slight contrast to white slide) |
 | Corner radius | 0 (sharp corners for professional/corporate look) |
-| Text font | Calibri, 22 pt, Semibold (600), #0F1330 |
+| Text font | Calibri, 22 pt, Bold (700), #0F1330 |
 | Text alignment | Left-aligned, vertically centered |
 | Inner padding | 12 pt all sides (18 pt on left to clear the accent border) |
 
@@ -254,7 +252,7 @@ Per D-06 and D-07.
 |----------|-----------|-------------------|-----------------|
 | Background | #0F1330 | #FFFFFF | #F2F4F8 |
 | Text color | #FFFFFF | #333333 | #333333 |
-| Font size | 14 pt | 12 pt | 12 pt |
+| Font size | 14 pt | 14 pt | 14 pt |
 | Font weight | Bold (700) | Regular (400) | Regular (400) |
 | Text alignment | Center | Per data type | Per data type |
 | Border | 1 pt #D1D5DB | 1 pt #D1D5DB | 1 pt #D1D5DB |
@@ -278,7 +276,7 @@ Per D-06 and D-07.
 | Column width | Auto-distribute evenly across available table width |
 | Minimum column width | 72 pt (1 inch) |
 | Row height | 28 pt (header), 24 pt (body) |
-| Maximum columns | 8 (wider tables truncate or reduce font to 10pt) |
+| Maximum columns | 8 |
 | Maximum data rows | 10 per slide (Template 3), 6 per slide (Template 4) |
 
 ---
@@ -292,7 +290,7 @@ For Phase 2, chart regions contain a placeholder shape. Phase 5 fills these with
 | Shape type | Rectangle (addGeometricShape) |
 | Fill | #E5E7EB (Light Gray) |
 | Border | 1 pt, #9CA3AF (Medium Gray), dashed |
-| Placeholder text | "Chart Area" centered, Calibri 16pt, #9CA3AF |
+| Placeholder text | "Chart Area" centered, Calibri 14pt, #9CA3AF |
 | Image insertion method | ShapeFill.setImage(base64) — GA in API 1.8 |
 | Target image resolution | 800 x 600 px (renders to shape bounds on slide) |
 
@@ -382,7 +380,7 @@ Fluent UI v9 `<Button>` components. Four buttons, one per layout template.
 | Color contrast (table header) | #FFFFFF on #0F1330 = 16.1:1 (WCAG AAA) |
 | Color contrast (table body) | #333333 on #FFFFFF = 12.6:1 / #333333 on #F2F4F8 = 11.2:1 (WCAG AAA) |
 | Color contrast (callout) | #0F1330 on #EBF0FA = 13.8:1 (WCAG AAA) |
-| Font size minimum | 10 pt (caption/source only). All primary content 12pt+ |
+| Font size minimum | 14 pt. All content uses 14pt or larger. |
 | Table structure | Native Office.js table (recognized by screen readers in PowerPoint) |
 | Alt text | Shape.altTextDescription set on chart placeholder: "Chart area - data visualization placeholder" |
 
