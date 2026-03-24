@@ -28,3 +28,18 @@ Rules:
 export function buildSlidePrompt(userQuestion: string): string {
   return `${SLIDE_SCHEMA}\n\nUser question: ${userQuestion}`;
 }
+
+/**
+ * Build a guided prompt that incorporates brand name and analysis purpose.
+ * Reuses the same SLIDE_SCHEMA as buildSlidePrompt for consistent JSON output.
+ * The product image is NOT sent to Cube AI — it is inserted directly on the slide.
+ */
+export function buildGuidedPrompt(brandName: string, purpose: string): string {
+  return `${SLIDE_SCHEMA}
+
+Focus: Provide analysis specifically about the brand "${brandName}".
+Analysis purpose: ${purpose}
+Include product-specific insights and metrics relevant to this brand.
+
+User question: Provide a ${purpose} for ${brandName}`;
+}

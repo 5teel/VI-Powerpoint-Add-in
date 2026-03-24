@@ -35,6 +35,7 @@ describe("resizeImageToBase64", () => {
   let mockCtx: { drawImage: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
+    vi.restoreAllMocks();
     mockCtx = { drawImage: vi.fn() };
     mockCanvas = {
       width: 0,
@@ -43,10 +44,14 @@ describe("resizeImageToBase64", () => {
       toDataURL: vi.fn().mockReturnValue("data:image/png;base64,abc123rawdata"),
     };
 
-    vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
-      if (tag === "canvas") return mockCanvas as unknown as HTMLCanvasElement;
-      return document.createElement(tag);
-    });
+    // Stub document.createElement to return our mock canvas
+    const mockDocument = {
+      createElement: vi.fn((tag: string) => {
+        if (tag === "canvas") return mockCanvas as unknown as HTMLCanvasElement;
+        return {} as HTMLElement;
+      }),
+    };
+    vi.stubGlobal("document", mockDocument);
   });
 
   it("returns a string that does NOT start with 'data:'", async () => {
@@ -57,7 +62,7 @@ describe("resizeImageToBase64", () => {
       onerror: null as (() => void) | null,
       result: "data:image/png;base64,inputdata",
     };
-    vi.spyOn(globalThis, "FileReader").mockImplementation(() => mockFileReader as unknown as FileReader);
+    vi.stubGlobal("FileReader", function () { return mockFileReader; });
 
     // Mock Image
     const mockImage = {
@@ -67,7 +72,7 @@ describe("resizeImageToBase64", () => {
       width: 400,
       height: 300,
     };
-    vi.spyOn(globalThis, "Image").mockImplementation(() => mockImage as unknown as HTMLImageElement);
+    vi.stubGlobal("Image", function () { return mockImage; });
 
     const file = new File(["x"], "photo.png", { type: "image/png" });
 
@@ -90,7 +95,7 @@ describe("resizeImageToBase64", () => {
       onerror: null as (() => void) | null,
       result: "data:image/png;base64,inputdata",
     };
-    vi.spyOn(globalThis, "FileReader").mockImplementation(() => mockFileReader as unknown as FileReader);
+    vi.stubGlobal("FileReader", function () { return mockFileReader; });
 
     const mockImage = {
       onload: null as (() => void) | null,
@@ -99,7 +104,7 @@ describe("resizeImageToBase64", () => {
       width: 1600,
       height: 1200,
     };
-    vi.spyOn(globalThis, "Image").mockImplementation(() => mockImage as unknown as HTMLImageElement);
+    vi.stubGlobal("Image", function () { return mockImage; });
 
     const file = new File(["x"], "photo.png", { type: "image/png" });
 
