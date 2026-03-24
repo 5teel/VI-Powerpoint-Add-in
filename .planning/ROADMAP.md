@@ -16,6 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 2: Slide Primitives** - Verify all Office.js rendering APIs (text, tables, image insertion, layout)
 - [x] **Phase 3: Cube AI Integration** - Build and validate the full NDJSON streaming pipeline with error handling (completed 2026-03-24)
 - [x] **Phase 4: Schema and End-to-End Pipeline** - Wire schema parser to slide renderer for first working question-to-slide (completed 2026-03-24)
+- [ ] **Phase 4.1: Guided Slide Builder** - Step-by-step wizard for branded, image-inclusive slides (INSERTED)
 - [ ] **Phase 5: Chart Rendering** - Chart.js canvas pipeline producing bar, line, and pie charts inserted as images
 - [ ] **Phase 6: Polish and Demo Readiness** - Multi-turn conversation, streaming UX, layout polish, and demo hardening
 
@@ -81,14 +82,17 @@ Plans:
 ### Phase 4.1: Guided Slide Builder (INSERTED)
 **Goal**: A step-by-step wizard that guides users through brand selection, image upload, analysis purpose, and slide design approval before building data-driven slides with product imagery
 **Depends on**: Phase 4
-**Requirements**: TBD
+**Requirements**: SC-01, SC-02, SC-03, SC-04, SC-05
 **Success Criteria** (what must be TRUE):
   1. User can select or enter a brand name to focus the analysis on
   2. User can upload a product image that is stored in session memory (base64) and displayed in the wizard
   3. User can choose the purpose/focus of the analysis (e.g., range review, performance breakdown, competitor comparison)
   4. User previews and approves a slide design before it is created in the presentation
   5. The created slide includes the uploaded product image placed in a shape region alongside data content
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 04.1-01-PLAN.md -- Image utilities, guided prompt builder, and slide renderer extension for product images
+- [ ] 04.1-02-PLAN.md -- WizardPanel UI with 4 steps, App.tsx tab integration, and end-to-end verification
 
 ### Phase 5: Chart Rendering
 **Goal**: Bar, line, and pie chart data from Cube AI JSON is rendered as correctly sized images and inserted into slides
@@ -99,10 +103,7 @@ Plans:
   2. Line charts and pie charts are rendered correctly from Cube AI data using the same pipeline
   3. Charts are inserted via ShapeFill.setImage() on a geometric shape (GA path) and the code includes addPicture() as a detectable enhancement for Preview-capable environments
   4. Chart images are rendered at sufficient resolution (~800x600px) to be legible when displayed on a standard slide
-**Plans**: 2 plans
-Plans:
-- [x] 04-01-PLAN.md -- Schema parser and prompt builder services with unit tests
-- [ ] 04-02-PLAN.md -- ChatPanel integration with Create Slide button and end-to-end verification
+**Plans**: TBD
 
 ### Phase 6: Polish and Demo Readiness
 **Goal**: The demo experience is complete — multi-turn conversation, streaming partial results, multi-slide output, and hardened error handling
@@ -113,15 +114,12 @@ Plans:
   2. User can refine a previous result ("change to pie chart") without starting a new conversation
   3. Streaming partial AI text is visible in the taskpane as the response arrives, not only after completion
   4. A complex query (e.g., quarterly review) produces a coherent multi-slide section with consistent visual styling and logical flow between slides
-**Plans**: 2 plans
-Plans:
-- [ ] 04-01-PLAN.md -- Schema parser and prompt builder services with unit tests
-- [ ] 04-02-PLAN.md -- ChatPanel integration with Create Slide button and end-to-end verification
+**Plans**: TBD
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 4.1 → 5 → 6
 
 Note: Phase 2 and Phase 3 have no dependency on each other — both depend only on Phase 1. They can be planned in parallel but execute sequentially (Phase 2 first, as primitives must be proven before schema wiring in Phase 4).
 
@@ -131,5 +129,6 @@ Note: Phase 2 and Phase 3 have no dependency on each other — both depend only 
 | 2. Slide Primitives | 3/3 | Complete |  |
 | 3. Cube AI Integration | 2/2 | Complete   | 2026-03-24 |
 | 4. Schema and End-to-End Pipeline | 2/2 | Complete   | 2026-03-24 |
+| 4.1. Guided Slide Builder | 0/2 | Not started | - |
 | 5. Chart Rendering | 0/TBD | Not started | - |
 | 6. Polish and Demo Readiness | 0/TBD | Not started | - |
