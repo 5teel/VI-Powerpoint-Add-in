@@ -3,8 +3,9 @@ import { TabList, Tab, SelectTabEvent, SelectTabData } from "@fluentui/react-com
 import Header from "./Header";
 import ChatPanel from "./ChatPanel";
 import SlideTestPanel from "./SlideTestPanel";
+import WizardPanel from "./WizardPanel";
 
-type TabValue = "slides" | "chat";
+type TabValue = "slides" | "chat" | "wizard";
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabValue>("chat");
@@ -27,6 +28,7 @@ const App: React.FC = () => {
       >
         <Tab value="chat">Ask Summit</Tab>
         <Tab value="slides">Slide Options</Tab>
+        <Tab value="wizard">Build Slide</Tab>
       </TabList>
       <div style={{
         flex: 1,
@@ -38,7 +40,15 @@ const App: React.FC = () => {
         backgroundColor: "rgba(255, 255, 255, 0.85)",
         boxShadow: "0 1px 4px rgba(0, 0, 0, 0.06)",
       }}>
-        {activeTab === "chat" ? <ChatPanel /> : <SlideTestPanel />}
+        <div style={{ display: activeTab === "chat" ? "flex" : "none", flexDirection: "column", flex: 1, overflow: "hidden" }}>
+          <ChatPanel />
+        </div>
+        <div style={{ display: activeTab === "slides" ? "flex" : "none", flexDirection: "column", flex: 1, overflow: "hidden" }}>
+          <SlideTestPanel />
+        </div>
+        <div style={{ display: activeTab === "wizard" ? "flex" : "none", flexDirection: "column", flex: 1, overflow: "hidden" }}>
+          <WizardPanel />
+        </div>
       </div>
     </div>
   );
