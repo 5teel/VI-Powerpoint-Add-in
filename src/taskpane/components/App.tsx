@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { TabList, Tab, SelectTabEvent, SelectTabData } from "@fluentui/react-components";
-import Header from "./Header";
 import ChatPanel from "./ChatPanel";
 import SlideTestPanel from "./SlideTestPanel";
 
@@ -15,7 +14,6 @@ const App: React.FC = () => {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
-      <Header />
       <TabList
         selectedValue={activeTab}
         onTabSelect={handleTabSelect}
