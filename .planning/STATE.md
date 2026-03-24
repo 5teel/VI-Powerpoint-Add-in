@@ -82,6 +82,10 @@ Recent decisions affecting current work:
 - [Phase 04]: Per-message slideState field ('idle'|'creating'|'created'|'failed') tracks Create Slide button lifecycle independently per message — prevents duplicate slide creation without any global lock
 - [Phase 04]: Wrapped question (buildSlidePrompt) sent to Cube AI; original question stored in messages state — schema injection is transparent to the chat UI
 
+### Roadmap Evolution
+
+- Phase 4.1 inserted after Phase 4: Guided Slide Builder — step-by-step wizard with brand selection, image upload, analysis purpose, slide design approval (INSERTED)
+
 ### Pending Todos
 
 None yet.

@@ -78,6 +78,18 @@ Plans:
 - [x] 04-01-PLAN.md -- Schema parser and prompt builder services with unit tests
 - [x] 04-02-PLAN.md -- ChatPanel integration with Create Slide button and end-to-end verification
 
+### Phase 4.1: Guided Slide Builder (INSERTED)
+**Goal**: A step-by-step wizard that guides users through brand selection, image upload, analysis purpose, and slide design approval before building data-driven slides with product imagery
+**Depends on**: Phase 4
+**Requirements**: TBD
+**Success Criteria** (what must be TRUE):
+  1. User can select or enter a brand name to focus the analysis on
+  2. User can upload a product image that is stored in session memory (base64) and displayed in the wizard
+  3. User can choose the purpose/focus of the analysis (e.g., range review, performance breakdown, competitor comparison)
+  4. User previews and approves a slide design before it is created in the presentation
+  5. The created slide includes the uploaded product image placed in a shape region alongside data content
+**Plans**: TBD
+
 ### Phase 5: Chart Rendering
 **Goal**: Bar, line, and pie chart data from Cube AI JSON is rendered as correctly sized images and inserted into slides
 **Depends on**: Phase 4
