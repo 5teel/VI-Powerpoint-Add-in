@@ -100,6 +100,55 @@ export function extractSlideContent(raw: string): SlideContent | null {
 }
 
 /**
+ * Generate a human-readable summary from parsed SlideContent for display in the chat UI.
+ * Hides raw JSON from the user — shows title, key points, and insight instead.
+ */
+export function summarizeSlideContent(content: SlideContent): string {
+  const parts: string[] = [];
+  parts.push(content.title);
+  parts.push("");
+
+  switch (content.type) {
+    case "text-only":
+      content.bullets.forEach((b) => parts.push(`• ${b}`));
+      if (content.insight) {
+        parts.push("");
+        parts.push(content.insight);
+      }
+      break;
+    case "chart-text":
+      content.summaryBullets.forEach((b) => parts.push(`• ${b}`));
+      if (content.insight) {
+        parts.push("");
+        parts.push(content.insight);
+      }
+      break;
+    case "table-text":
+      if (content.headers.length > 0) {
+        parts.push(`Table: ${content.headers.join(" | ")}`);
+        parts.push(`(${content.rows.length} rows)`);
+      }
+      if (content.summary) {
+        parts.push("");
+        parts.push(content.summary);
+      }
+      break;
+    case "full-combination":
+      if (content.headers.length > 0) {
+        parts.push(`Table: ${content.headers.join(" | ")}`);
+        parts.push(`(${content.rows.length} rows)`);
+      }
+      if (content.insight) {
+        parts.push("");
+        parts.push(content.insight);
+      }
+      break;
+  }
+
+  return parts.join("\n");
+}
+
+/**
  * Convert raw text into a TextOnlyContent object as a fallback
  * when JSON extraction fails.
  */

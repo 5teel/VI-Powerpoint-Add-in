@@ -10,7 +10,7 @@ import {
 } from "@fluentui/react-components";
 import { streamCubeAI, StreamPhase, CubeAIStreamResult, CubeAIError } from "../services/cubeai";
 import { buildSlidePrompt } from "../services/promptBuilder";
-import { extractSlideContent, fallbackToTextOnly } from "../services/schemaParser";
+import { extractSlideContent, fallbackToTextOnly, summarizeSlideContent } from "../services/schemaParser";
 import { insertSlide } from "../services/slideRenderer";
 
 const SUMMIT_NAVY = "#0F1330";
@@ -18,6 +18,7 @@ const SUMMIT_NAVY = "#0F1330";
 interface ChatMessage {
   role: "user" | "assistant" | "error";
   content: string;
+  rawContent?: string; // Original response for slide creation (may contain JSON)
   error?: CubeAIError;
   slideState?: "idle" | "creating" | "created" | "failed";
 }
@@ -65,9 +66,15 @@ const ChatPanel: React.FC = () => {
         onPhaseChange: (p: StreamPhase) => setPhase(p),
         onContent: (content: string) => setStreamingContent(content),
         onComplete: (result: CubeAIStreamResult) => {
+          const raw = result.content || "";
+          const parsed = extractSlideContent(raw);
+          const displayText = parsed
+            ? summarizeSlideContent(parsed)
+            : raw || "(No response received)";
           setMessages((prev) => [...prev, {
             role: "assistant",
-            content: result.content || "(No response received)",
+            content: displayText,
+            rawContent: raw,
             slideState: "idle",
           }]);
           setStreamingContent("");
@@ -99,7 +106,8 @@ const ChatPanel: React.FC = () => {
     ));
 
     try {
-      const content = extractSlideContent(msg.content) ?? fallbackToTextOnly(msg.content);
+      const sourceText = msg.rawContent || msg.content;
+      const content = extractSlideContent(sourceText) ?? fallbackToTextOnly(sourceText);
       await insertSlide(content);
       setMessages(prev => prev.map((m, i) =>
         i === messageIndex ? { ...m, slideState: "created" as const } : m
