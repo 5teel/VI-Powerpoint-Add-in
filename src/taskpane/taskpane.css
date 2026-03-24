@@ -6,4 +6,5 @@ html, body, #container {
   overflow: hidden;
   font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
   background: linear-gradient(165deg, #EEF1F8 0%, #E8ECF5 50%, #E2E7F2 100%);
+  border-radius: 12px;
 }

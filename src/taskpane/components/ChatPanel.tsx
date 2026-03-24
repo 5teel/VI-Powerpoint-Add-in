@@ -141,13 +141,46 @@ const ChatPanel: React.FC = () => {
       >
         {/* Welcome state */}
         {messages.length === 0 && !phase && (
-          <div style={{ textAlign: "center", marginTop: "48px" }}>
+          <div style={{ textAlign: "center", marginTop: "40px", padding: "0 12px" }}>
             <Text weight="semibold" size={400} block>
               Build your presentation with Summit
             </Text>
             <Text size={300} style={{ color: "#616161", marginTop: "8px", display: "block" }}>
               Ask a question and Summit will create a data-driven slide for your deck.
             </Text>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "24px" }}>
+              {[
+                "What were total sales last quarter?",
+                "Show me the top 5 products by revenue",
+                "Compare regional performance year over year",
+              ].map((suggestion) => (
+                <button
+                  key={suggestion}
+                  onClick={() => { setQuery(suggestion); handleSubmit(suggestion); }}
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: "10px",
+                    border: "1px solid rgba(15, 19, 48, 0.12)",
+                    backgroundColor: "rgba(255, 255, 255, 0.7)",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    fontSize: "13px",
+                    color: SUMMIT_NAVY,
+                    transition: "background-color 0.15s, border-color 0.15s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "rgba(15, 19, 48, 0.06)";
+                    e.currentTarget.style.borderColor = "rgba(15, 19, 48, 0.25)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.7)";
+                    e.currentTarget.style.borderColor = "rgba(15, 19, 48, 0.12)";
+                  }}
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -293,7 +326,7 @@ const ChatPanel: React.FC = () => {
       >
         <Input
           style={{ flex: 1 }}
-          placeholder="Ask Summit a question..."
+          placeholder="Ask Summit..."
           value={query}
           onChange={(_, data) => setQuery(data.value)}
           onKeyDown={handleKeyDown}
@@ -309,7 +342,7 @@ const ChatPanel: React.FC = () => {
             minHeight: "32px",
           }}
         >
-          Send
+          Go
         </Button>
       </div>
     </div>
