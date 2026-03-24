@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Foundation** - Scaffold add-in, load in PowerPoint taskpane, prove Cube AI API connectivity
 - [ ] **Phase 2: Slide Primitives** - Verify all Office.js rendering APIs (text, tables, image insertion, layout)
-- [ ] **Phase 3: Cube AI Integration** - Build and validate the full NDJSON streaming pipeline with error handling
+- [x] **Phase 3: Cube AI Integration** - Build and validate the full NDJSON streaming pipeline with error handling (completed 2026-03-24)
 - [ ] **Phase 4: Schema and End-to-End Pipeline** - Wire schema parser to slide renderer for first working question-to-slide
 - [ ] **Phase 5: Chart Rendering** - Chart.js canvas pipeline producing bar, line, and pie charts inserted as images
 - [ ] **Phase 6: Polish and Demo Readiness** - Multi-turn conversation, streaming UX, layout polish, and demo hardening
@@ -61,8 +61,8 @@ Plans:
   4. When an API call fails or returns a malformed response, a clear error message is displayed in the taskpane (not a blank screen or crash)
 **Plans**: 2 plans
 Plans:
-- [ ] 03-01-PLAN.md -- Streaming NDJSON client with callback interface and unit tests
-- [ ] 03-02-PLAN.md -- ChatPanel streaming UI with phase spinner, inline errors, and retry
+- [x] 03-01-PLAN.md -- Streaming NDJSON client with callback interface and unit tests
+- [x] 03-02-PLAN.md -- ChatPanel streaming UI with phase spinner, inline errors, and retry
 
 ### Phase 4: Schema and End-to-End Pipeline
 **Goal**: A user can type a business question, Cube AI returns a conforming JSON slide schema, and a fully populated slide appears in PowerPoint
@@ -108,7 +108,7 @@ Note: Phase 2 and Phase 3 have no dependency on each other — both depend only 
 |-------|----------------|--------|-----------|
 | 1. Foundation | 2/2 | Complete | 2026-03-23 |
 | 2. Slide Primitives | 3/3 | Complete |  |
-| 3. Cube AI Integration | 0/2 | Not started | - |
+| 3. Cube AI Integration | 2/2 | Complete   | 2026-03-24 |
 | 4. Schema and End-to-End Pipeline | 0/TBD | Not started | - |
 | 5. Chart Rendering | 0/TBD | Not started | - |
 | 6. Polish and Demo Readiness | 0/TBD | Not started | - |

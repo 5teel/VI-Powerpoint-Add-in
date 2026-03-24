@@ -10,14 +10,14 @@ Requirements for internal demo release. Each maps to roadmap phases.
 ### Taskpane Input
 
 - [ ] **TASK-01**: User can type a natural language business question in the taskpane input
-- [ ] **TASK-02**: User sees loading/progress indication while Cube AI processes (3-15s)
-- [ ] **TASK-03**: User sees clear error messages when API calls fail or responses are malformed
+- [x] **TASK-02**: User sees loading/progress indication while Cube AI processes (3-15s)
+- [x] **TASK-03**: User sees clear error messages when API calls fail or responses are malformed
 - [ ] **TASK-04**: User sees streaming partial AI results in the taskpane as they arrive from Cube AI
 
 ### Cube AI Integration
 
-- [ ] **CUBE-01**: Add-in connects directly to Cube AI Chat API via HTTPS with API key authentication
-- [ ] **CUBE-02**: Add-in parses streaming NDJSON responses with correct line buffering across chunk boundaries
+- [x] **CUBE-01**: Add-in connects directly to Cube AI Chat API via HTTPS with API key authentication
+- [x] **CUBE-02**: Add-in parses streaming NDJSON responses with correct line buffering across chunk boundaries
 - [ ] **CUBE-03**: User can ask follow-up questions that maintain conversation context via Cube AI chatId
 - [ ] **CUBE-04**: User can refine previous results ("change to pie chart", "add Q3 numbers") without starting over
 
@@ -29,10 +29,10 @@ Requirements for internal demo release. Each maps to roadmap phases.
 
 ### Text Rendering
 
-- [ ] **TEXT-01**: Add-in renders slide titles from Cube AI response
-- [ ] **TEXT-02**: Add-in renders body text (bullet points, paragraphs) from Cube AI response
-- [ ] **TEXT-03**: Add-in renders key insight callout box highlighting the most important takeaway
-- [ ] **TEXT-04**: Generated text uses professional formatting (consistent fonts, spacing, alignment)
+- [x] **TEXT-01**: Add-in renders slide titles from Cube AI response
+- [x] **TEXT-02**: Add-in renders body text (bullet points, paragraphs) from Cube AI response
+- [x] **TEXT-03**: Add-in renders key insight callout box highlighting the most important takeaway
+- [x] **TEXT-04**: Generated text uses professional formatting (consistent fonts, spacing, alignment)
 
 ### Chart Rendering
 
@@ -43,14 +43,14 @@ Requirements for internal demo release. Each maps to roadmap phases.
 
 ### Table Rendering
 
-- [ ] **TABL-01**: Add-in renders formatted data tables on slides via Office.js addTable()
-- [ ] **TABL-02**: Tables include headers, data rows, and basic cell formatting (borders, alignment, number formatting)
+- [x] **TABL-01**: Add-in renders formatted data tables on slides via Office.js addTable()
+- [x] **TABL-02**: Tables include headers, data rows, and basic cell formatting (borders, alignment, number formatting)
 
 ### Layout Intelligence
 
 - [ ] **LYOT-01**: Cube AI determines the appropriate layout type based on data (chart vs table vs bullets vs combination)
-- [ ] **LYOT-02**: Add-in supports multiple layout templates (text-only, chart+text, table+text, chart+table+text)
-- [ ] **LYOT-03**: New slides are inserted at the current position in the deck
+- [x] **LYOT-02**: Add-in supports multiple layout templates (text-only, chart+text, table+text, chart+table+text)
+- [x] **LYOT-03**: New slides are inserted at the current position in the deck
 
 ### Multi-Slide Generation
 
@@ -102,28 +102,28 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | TASK-01 | Phase 4 | Pending |
 | TASK-02 | Phase 1, Phase 3 | Complete (Phase 1) |
-| TASK-03 | Phase 3 | Pending |
+| TASK-03 | Phase 3 | Complete |
 | TASK-04 | Phase 6 | Pending |
-| CUBE-01 | Phase 3 | Pending |
-| CUBE-02 | Phase 3 | Pending |
+| CUBE-01 | Phase 3 | Complete |
+| CUBE-02 | Phase 3 | Complete |
 | CUBE-03 | Phase 6 | Pending |
 | CUBE-04 | Phase 6 | Pending |
 | SCHM-01 | Phase 4 | Pending |
 | SCHM-02 | Phase 4 | Pending |
 | SCHM-03 | Phase 4 | Pending |
-| TEXT-01 | Phase 2 | Pending |
-| TEXT-02 | Phase 2 | Pending |
-| TEXT-03 | Phase 2 | Pending |
-| TEXT-04 | Phase 2 | Pending |
+| TEXT-01 | Phase 2 | Complete |
+| TEXT-02 | Phase 2 | Complete |
+| TEXT-03 | Phase 2 | Complete |
+| TEXT-04 | Phase 2 | Complete |
 | CHRT-01 | Phase 5 | Pending |
 | CHRT-02 | Phase 5 | Pending |
 | CHRT-03 | Phase 5 | Pending |
 | CHRT-04 | Phase 5 | Pending |
-| TABL-01 | Phase 2 | Pending |
-| TABL-02 | Phase 2 | Pending |
+| TABL-01 | Phase 2 | Complete |
+| TABL-02 | Phase 2 | Complete |
 | LYOT-01 | Phase 4 | Pending |
-| LYOT-02 | Phase 2 | Pending |
-| LYOT-03 | Phase 2 | Pending |
+| LYOT-02 | Phase 2 | Complete |
+| LYOT-03 | Phase 2 | Complete |
 | MLTS-01 | Phase 6 | Pending |
 | MLTS-02 | Phase 6 | Pending |
 | BRND-01 | Phase 1 | Complete |
