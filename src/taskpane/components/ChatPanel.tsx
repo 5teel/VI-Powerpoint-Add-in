@@ -9,6 +9,9 @@ import {
   Text,
 } from "@fluentui/react-components";
 import { streamCubeAI, StreamPhase, CubeAIStreamResult, CubeAIError } from "../services/cubeai";
+import { buildSlidePrompt } from "../services/promptBuilder";
+import { extractSlideContent, fallbackToTextOnly } from "../services/schemaParser";
+import { insertSlide } from "../services/slideRenderer";
 
 const SUMMIT_NAVY = "#0F1330";
 
@@ -16,6 +19,7 @@ interface ChatMessage {
   role: "user" | "assistant" | "error";
   content: string;
   error?: CubeAIError;
+  slideState?: "idle" | "creating" | "created" | "failed";
 }
 
 const PHASE_LABELS: Record<StreamPhase, string> = {
@@ -56,11 +60,16 @@ const ChatPanel: React.FC = () => {
       setQuery("");
       setStreamingContent("");
 
-      const controller = streamCubeAI(question, chatId, {
+      const wrappedQuestion = buildSlidePrompt(question);
+      const controller = streamCubeAI(wrappedQuestion, chatId, {
         onPhaseChange: (p: StreamPhase) => setPhase(p),
         onContent: (content: string) => setStreamingContent(content),
         onComplete: (result: CubeAIStreamResult) => {
-          setMessages((prev) => [...prev, { role: "assistant", content: result.content || "(No response received)" }]);
+          setMessages((prev) => [...prev, {
+            role: "assistant",
+            content: result.content || "(No response received)",
+            slideState: "idle",
+          }]);
           setStreamingContent("");
           setPhase(null);
           if (result.chatId) setChatId(result.chatId);
@@ -80,6 +89,27 @@ const ChatPanel: React.FC = () => {
   const handleRetry = useCallback(() => {
     if (lastQuestion) handleSubmit(lastQuestion);
   }, [lastQuestion, handleSubmit]);
+
+  const handleCreateSlide = useCallback(async (messageIndex: number) => {
+    const msg = messages[messageIndex];
+    if (!msg || msg.role !== "assistant" || msg.slideState !== "idle") return;
+
+    setMessages(prev => prev.map((m, i) =>
+      i === messageIndex ? { ...m, slideState: "creating" as const } : m
+    ));
+
+    try {
+      const content = extractSlideContent(msg.content) ?? fallbackToTextOnly(msg.content);
+      await insertSlide(content);
+      setMessages(prev => prev.map((m, i) =>
+        i === messageIndex ? { ...m, slideState: "created" as const } : m
+      ));
+    } catch (err) {
+      setMessages(prev => prev.map((m, i) =>
+        i === messageIndex ? { ...m, slideState: "failed" as const } : m
+      ));
+    }
+  }, [messages]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -149,6 +179,52 @@ const ChatPanel: React.FC = () => {
                 >
                   <Text size={300}>{msg.content}</Text>
                 </div>
+                {msg.slideState === "idle" && (
+                  <Button
+                    appearance="primary"
+                    size="small"
+                    onClick={() => handleCreateSlide(i)}
+                    style={{ marginTop: "4px", backgroundColor: SUMMIT_NAVY }}
+                  >
+                    Create Slide
+                  </Button>
+                )}
+                {msg.slideState === "creating" && (
+                  <Button
+                    appearance="primary"
+                    size="small"
+                    disabled
+                    style={{ marginTop: "4px" }}
+                  >
+                    <Spinner size="tiny" /> Creating...
+                  </Button>
+                )}
+                {msg.slideState === "created" && (
+                  <Text
+                    size={200}
+                    style={{ marginTop: "4px", color: "#107C10", display: "block" }}
+                  >
+                    &#10003; Slide created
+                  </Text>
+                )}
+                {msg.slideState === "failed" && (
+                  <div style={{ marginTop: "4px" }}>
+                    <Text size={200} style={{ color: "#D13438" }}>
+                      Failed to create slide
+                    </Text>
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        setMessages(prev => prev.map((m, idx) =>
+                          idx === i ? { ...m, slideState: "idle" as const } : m
+                        ));
+                      }}
+                      style={{ marginLeft: "8px" }}
+                    >
+                      Retry
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
             {msg.role === "error" && (
