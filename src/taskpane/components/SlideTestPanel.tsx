@@ -65,11 +65,11 @@ const SlideTestPanel: React.FC = () => {
       }}
     >
       <Text weight="semibold" size={400} block>
-        Slide Primitive Tests
+        Slide Options
       </Text>
 
       <Text size={300} style={{ color: "#616161" }}>
-        Use the buttons below to test each slide layout template.
+        Insert sample slides to preview each layout template.
       </Text>
 
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>

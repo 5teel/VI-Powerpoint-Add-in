@@ -24,9 +24,9 @@ interface ChatMessage {
 }
 
 const PHASE_LABELS: Record<StreamPhase, string> = {
-  connecting: "Connecting to Cube AI...",
+  connecting: "Connecting to Summit...",
   connected: "Analyzing your question...",
-  streaming: "Generating response...",
+  streaming: "Building your slide...",
   complete: "",
 };
 
@@ -143,10 +143,10 @@ const ChatPanel: React.FC = () => {
         {messages.length === 0 && !phase && (
           <div style={{ textAlign: "center", marginTop: "48px" }}>
             <Text weight="semibold" size={400} block>
-              Ask a question about your data
+              Build your presentation with Summit
             </Text>
             <Text size={300} style={{ color: "#616161", marginTop: "8px", display: "block" }}>
-              Type a question below and Cube AI will generate insights.
+              Ask a question and Summit will create a data-driven slide for your deck.
             </Text>
           </div>
         )}
@@ -162,7 +162,7 @@ const ChatPanel: React.FC = () => {
                     backgroundColor: SUMMIT_NAVY,
                     color: "white",
                     padding: "8px 12px",
-                    borderRadius: "8px",
+                    borderRadius: "12px",
                     maxWidth: "85%",
                     textAlign: "left",
                   }}
@@ -179,7 +179,7 @@ const ChatPanel: React.FC = () => {
                   style={{
                     backgroundColor: "#F5F5F5",
                     padding: "8px 12px",
-                    borderRadius: "8px",
+                    borderRadius: "12px",
                     maxWidth: "85%",
                     whiteSpace: "pre-wrap",
                     wordBreak: "break-word",
@@ -293,7 +293,7 @@ const ChatPanel: React.FC = () => {
       >
         <Input
           style={{ flex: 1 }}
-          placeholder="Ask a question about your data..."
+          placeholder="Ask Summit a question..."
           value={query}
           onChange={(_, data) => setQuery(data.value)}
           onKeyDown={handleKeyDown}
