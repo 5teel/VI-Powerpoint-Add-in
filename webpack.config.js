@@ -86,6 +86,9 @@ module.exports = async (env, options) => {
       }),
     ],
     devServer: {
+      client: {
+        overlay: false,
+      },
       headers: {
         "Access-Control-Allow-Origin": "*",
       },

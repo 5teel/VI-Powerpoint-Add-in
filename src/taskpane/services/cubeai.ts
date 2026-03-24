@@ -53,7 +53,9 @@ export function streamCubeAI(
           body: JSON.stringify({
             input: question,
             sessionSettings: {
-              externalId: CUBEAI_CONFIG.externalId,
+              ...(CUBEAI_CONFIG.internalId
+                ? { internalId: CUBEAI_CONFIG.internalId }
+                : { externalId: CUBEAI_CONFIG.externalId }),
               ...(chatId ? { chatId } : {}),
             },
           }),
@@ -64,7 +66,6 @@ export function streamCubeAI(
         if (controller.signal.aborted) return;
 
         const errorMsg = String(err);
-        console.error("Cube AI error:", err);
 
         if (errorMsg.includes("Failed to fetch") || errorMsg.includes("NetworkError")) {
           callbacks.onError({
@@ -92,8 +93,6 @@ export function streamCubeAI(
 
       // HTTP error handling
       if (!response.ok) {
-        console.error("Cube AI HTTP error:", response.status);
-
         if (response.status === 401 || response.status === 403) {
           callbacks.onError({
             message: "Authentication failed. The API key may be invalid.",
@@ -161,6 +160,16 @@ export function streamCubeAI(
           try {
             const message = JSON.parse(line);
 
+            // Check for JSON-RPC error (Cube AI returns 200 OK with error body)
+            if (message.error?.message) {
+              callbacks.onError({
+                message: message.error.message,
+                type: "server",
+                retryable: true,
+              });
+              return;
+            }
+
             // Capture chat ID from state message
             if (message.state?.chatId) {
               responseChatId = message.state.chatId;
@@ -223,7 +232,6 @@ export function streamCubeAI(
       // Do not report errors if the caller intentionally aborted
       if (controller.signal.aborted) return;
 
-      console.error("Cube AI error:", err);
       callbacks.onError({
         message: "Something went wrong. Please try again.",
         type: "unknown",

@@ -60,7 +60,7 @@ const ChatPanel: React.FC = () => {
         onPhaseChange: (p: StreamPhase) => setPhase(p),
         onContent: (content: string) => setStreamingContent(content),
         onComplete: (result: CubeAIStreamResult) => {
-          setMessages((prev) => [...prev, { role: "assistant", content: result.content }]);
+          setMessages((prev) => [...prev, { role: "assistant", content: result.content || "(No response received)" }]);
           setStreamingContent("");
           setPhase(null);
           if (result.chatId) setChatId(result.chatId);

@@ -89,7 +89,11 @@ describe("streamCubeAI", () => {
 
     const body = JSON.parse(capturedRequest!.init.body as string);
     expect(body.input).toBe("test question");
-    expect(body.sessionSettings.externalId).toBe(CUBEAI_CONFIG.externalId);
+    if (CUBEAI_CONFIG.internalId) {
+      expect(body.sessionSettings.internalId).toBe(CUBEAI_CONFIG.internalId);
+    } else {
+      expect(body.sessionSettings.externalId).toBe(CUBEAI_CONFIG.externalId);
+    }
     expect(body.sessionSettings.chatId).toBeUndefined();
   });
 
