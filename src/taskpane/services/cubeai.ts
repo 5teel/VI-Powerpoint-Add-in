@@ -1,173 +1,238 @@
-// Cube AI streaming API client adapted for browser context.
+// Cube AI streaming API client with callback-based delivery.
+// Refactored from testCubeAIConnection() into production streaming client.
 // Pattern source: C:\Development\Summit MCP Server - Claude\src\cubeai.ts
 
 import { CUBEAI_CONFIG } from "../config";
 
-export interface CubeAITestResult {
-  success: boolean;
-  responseTimeMs: number;
-  content?: string; // First 500 chars of response content
-  chatId?: string | null;
-  error?: string;
-  errorType?: "cors" | "auth" | "network" | "server" | "unknown";
+export type StreamPhase = "connecting" | "connected" | "streaming" | "complete";
+
+export interface CubeAIStreamResult {
+  content: string;
+  chatId: string | null;
+}
+
+export interface CubeAIError {
+  message: string;
+  type: "cors" | "auth" | "network" | "server" | "timeout" | "empty" | "unknown";
+  retryable: boolean;
+}
+
+export interface StreamCallbacks {
+  onPhaseChange: (phase: StreamPhase) => void;
+  onContent: (accumulatedContent: string) => void;
+  onComplete: (result: CubeAIStreamResult) => void;
+  onError: (error: CubeAIError) => void;
 }
 
 /**
- * Test connectivity to the Cube AI Chat API.
- * Makes a real streaming request, parses NDJSON, and reports the result.
- * Used by the ChatPanel to validate CORS and auth before investing in UI work.
+ * Stream a question to Cube AI and deliver progressive content via callbacks.
+ *
+ * Returns an AbortController so the caller can cancel the request (e.g., on unmount).
+ * The async work runs inside an IIFE so this function returns synchronously.
  */
-export async function testCubeAIConnection(question: string): Promise<CubeAITestResult> {
-  const startTime = performance.now();
+export function streamCubeAI(
+  question: string,
+  chatId: string | null,
+  callbacks: StreamCallbacks
+): AbortController {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), CUBEAI_CONFIG.timeoutMs);
 
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), CUBEAI_CONFIG.timeoutMs);
+  callbacks.onPhaseChange("connecting");
 
-    let response: Response;
+  (async () => {
     try {
-      response = await fetch(CUBEAI_CONFIG.baseUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Api-Key ${CUBEAI_CONFIG.apiKey}`,
-        },
-        body: JSON.stringify({
-          input: question,
-          sessionSettings: {
-            externalId: CUBEAI_CONFIG.externalId,
+      let response: Response;
+      try {
+        response = await fetch(CUBEAI_CONFIG.baseUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Api-Key ${CUBEAI_CONFIG.apiKey}`,
           },
-        }),
-        signal: controller.signal,
-      });
-    } catch (err) {
-      clearTimeout(timeout);
-      const elapsed = Math.round(performance.now() - startTime);
-      // TypeError: Failed to fetch is the hallmark of CORS failure
-      const errorMsg = String(err);
-      if (errorMsg.includes("Failed to fetch") || errorMsg.includes("NetworkError")) {
-        return {
-          success: false,
-          responseTimeMs: elapsed,
-          error:
-            "Connection failed: The Cube AI server blocked this request. A proxy server is needed. See decision D-06 in CONTEXT.md.",
-          errorType: "cors",
-        };
+          body: JSON.stringify({
+            input: question,
+            sessionSettings: {
+              externalId: CUBEAI_CONFIG.externalId,
+              ...(chatId ? { chatId } : {}),
+            },
+          }),
+          signal: controller.signal,
+        });
+      } catch (err) {
+        // Do not report errors if the caller intentionally aborted
+        if (controller.signal.aborted) return;
+
+        const errorMsg = String(err);
+        console.error("Cube AI error:", err);
+
+        if (errorMsg.includes("Failed to fetch") || errorMsg.includes("NetworkError")) {
+          callbacks.onError({
+            message: "Unable to reach Cube AI. Please check your connection and try again.",
+            type: "cors",
+            retryable: false,
+          });
+          return;
+        }
+        if (errorMsg.includes("AbortError") || errorMsg.includes("aborted")) {
+          callbacks.onError({
+            message: "The request timed out. Cube AI may be busy -- please try again.",
+            type: "timeout",
+            retryable: true,
+          });
+          return;
+        }
+        callbacks.onError({
+          message: "Connection failed. Please check your network and try again.",
+          type: "network",
+          retryable: true,
+        });
+        return;
       }
-      if (errorMsg.includes("AbortError") || errorMsg.includes("aborted")) {
-        return {
-          success: false,
-          responseTimeMs: elapsed,
-          error: `Request timed out after ${CUBEAI_CONFIG.timeoutMs / 1000}s. The Cube AI server did not respond.`,
-          errorType: "network",
-        };
+
+      // HTTP error handling
+      if (!response.ok) {
+        console.error("Cube AI HTTP error:", response.status);
+
+        if (response.status === 401 || response.status === 403) {
+          callbacks.onError({
+            message: "Authentication failed. The API key may be invalid.",
+            type: "auth",
+            retryable: false,
+          });
+          return;
+        }
+        if (response.status === 429) {
+          callbacks.onError({
+            message: "Cube AI is busy. Please wait a moment and try again.",
+            type: "server",
+            retryable: true,
+          });
+          return;
+        }
+        if (response.status >= 500) {
+          callbacks.onError({
+            message: "Cube AI encountered an error. Please try again.",
+            type: "server",
+            retryable: true,
+          });
+          return;
+        }
+        callbacks.onError({
+          message: "Something went wrong. Please try again.",
+          type: "unknown",
+          retryable: false,
+        });
+        return;
       }
-      return {
-        success: false,
-        responseTimeMs: elapsed,
-        error: `Connection failed: Could not reach the Cube AI server. Check your network connection and try again. (${errorMsg})`,
-        errorType: "network",
-      };
-    }
 
-    if (!response.ok) {
-      clearTimeout(timeout);
-      const elapsed = Math.round(performance.now() - startTime);
-      if (response.status === 401 || response.status === 403) {
-        return {
-          success: false,
-          responseTimeMs: elapsed,
-          error: "Authentication failed: The API key was rejected. Verify the key in your configuration.",
-          errorType: "auth",
-        };
+      // Empty body check
+      if (!response.body) {
+        callbacks.onError({
+          message: "Cube AI returned an empty response. Please try again.",
+          type: "empty",
+          retryable: true,
+        });
+        return;
       }
-      return {
-        success: false,
-        responseTimeMs: elapsed,
-        error: `Cube AI returned HTTP ${response.status}: ${await response.text().catch(() => "no body")}`,
-        errorType: response.status >= 500 ? "server" : "unknown",
-      };
-    }
 
-    // Parse NDJSON streaming response (adapted from MCP server pattern)
-    if (!response.body) {
-      clearTimeout(timeout);
-      return {
-        success: false,
-        responseTimeMs: Math.round(performance.now() - startTime),
-        error: "Cube AI returned no response body.",
-        errorType: "unknown",
-      };
-    }
+      callbacks.onPhaseChange("connected");
 
-    let chatId: string | null = null;
-    let streamContent = "";
-    let buffer = "";
+      // NDJSON streaming loop
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let streamContent = "";
+      let responseChatId: string | null = null;
+      let lastFlush = 0;
+      let firstDelta = true;
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        // Keep last incomplete line in buffer
+        buffer = lines.pop() || "";
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      // Keep last incomplete line in buffer
-      buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const message = JSON.parse(line);
 
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        try {
-          const message = JSON.parse(line);
+            // Capture chat ID from state message
+            if (message.state?.chatId) {
+              responseChatId = message.state.chatId;
+            }
 
-          // Capture chat ID from state message
-          if (message.state?.chatId) {
-            chatId = message.state.chatId;
+            // Accumulate assistant content
+            if (message.role === "assistant" && message.content) {
+              if (message.isDelta) {
+                streamContent += message.content;
+                if (firstDelta) {
+                  callbacks.onPhaseChange("streaming");
+                  firstDelta = false;
+                }
+              } else if (!message.isInProcess) {
+                // Final non-delta message contains the complete response
+                streamContent = message.content;
+              }
+            }
+          } catch {
+            // Skip unparseable lines
           }
+        }
 
-          // Accumulate assistant content
+        // Throttled flush (~200ms intervals)
+        const now = performance.now();
+        if (now - lastFlush >= 200) {
+          callbacks.onContent(streamContent);
+          lastFlush = now;
+        }
+      }
+
+      // Process remaining buffer content (Pitfall 3)
+      if (buffer.trim()) {
+        try {
+          const message = JSON.parse(buffer);
+          if (message.state?.chatId) {
+            responseChatId = message.state.chatId;
+          }
           if (message.role === "assistant" && message.content) {
             if (message.isDelta) {
               streamContent += message.content;
+              if (firstDelta) {
+                callbacks.onPhaseChange("streaming");
+                firstDelta = false;
+              }
             } else if (!message.isInProcess) {
-              // Final non-delta message contains the complete response
               streamContent = message.content;
             }
           }
         } catch {
-          // Skip unparseable lines
+          // Skip unparseable remaining buffer
         }
       }
+
+      // Always perform final un-throttled flush (Pitfall 4)
+      callbacks.onContent(streamContent);
+      callbacks.onPhaseChange("complete");
+      callbacks.onComplete({ content: streamContent, chatId: responseChatId });
+    } catch (err) {
+      // Do not report errors if the caller intentionally aborted
+      if (controller.signal.aborted) return;
+
+      console.error("Cube AI error:", err);
+      callbacks.onError({
+        message: "Something went wrong. Please try again.",
+        type: "unknown",
+        retryable: false,
+      });
+    } finally {
+      clearTimeout(timeout);
     }
+  })();
 
-    // Process remaining buffer
-    if (buffer.trim()) {
-      try {
-        const message = JSON.parse(buffer);
-        if (message.role === "assistant" && message.content && !message.isInProcess) {
-          streamContent = message.content;
-        }
-      } catch {
-        // Skip
-      }
-    }
-
-    clearTimeout(timeout);
-    const elapsed = Math.round(performance.now() - startTime);
-
-    return {
-      success: true,
-      responseTimeMs: elapsed,
-      content: streamContent.substring(0, 500),
-      chatId,
-    };
-  } catch (err) {
-    return {
-      success: false,
-      responseTimeMs: Math.round(performance.now() - startTime),
-      error: `Something went wrong: ${String(err)}. Try again or check the browser console for details.`,
-      errorType: "unknown",
-    };
-  }
+  return controller;
 }

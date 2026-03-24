@@ -10,25 +10,47 @@ import {
   MessageBarBody,
   Text,
 } from "@fluentui/react-components";
-import { testCubeAIConnection, CubeAITestResult } from "../services/cubeai";
+import { streamCubeAI, CubeAIStreamResult, CubeAIError } from "../services/cubeai";
 
 const SUMMIT_NAVY = "#0F1330";
 
 type PanelState = "idle" | "loading" | "success" | "error";
 
+interface LegacyResult {
+  success: boolean;
+  content?: string;
+  error?: string;
+  responseTimeMs?: number;
+}
+
 const ChatPanel: React.FC = () => {
   const [query, setQuery] = useState("");
   const [panelState, setPanelState] = useState<PanelState>("idle");
-  const [result, setResult] = useState<CubeAITestResult | null>(null);
+  const [result, setResult] = useState<LegacyResult | null>(null);
 
   const handleSubmit = async () => {
     if (!query.trim() || panelState === "loading") return;
     setPanelState("loading");
     setResult(null);
 
-    const testResult = await testCubeAIConnection(query.trim());
-    setResult(testResult);
-    setPanelState(testResult.success ? "success" : "error");
+    const startTime = performance.now();
+    streamCubeAI(query.trim(), null, {
+      onPhaseChange: () => {},
+      onContent: () => {},
+      onComplete: (streamResult: CubeAIStreamResult) => {
+        const elapsed = Math.round(performance.now() - startTime);
+        setResult({
+          success: true,
+          content: streamResult.content.substring(0, 500),
+          responseTimeMs: elapsed,
+        });
+        setPanelState("success");
+      },
+      onError: (err: CubeAIError) => {
+        setResult({ success: false, error: err.message });
+        setPanelState("error");
+      },
+    });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
