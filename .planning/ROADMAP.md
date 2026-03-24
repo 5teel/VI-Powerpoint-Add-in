@@ -73,7 +73,10 @@ Plans:
   2. Cube AI returns JSON matching the SlideLayout schema and a new slide is created in the active presentation
   3. Cube AI's schema output determines the layout type (text-only, chart, table, or combination) and the correct layout template is applied
   4. When Cube AI returns malformed or non-conforming JSON, the parser recovers gracefully and either renders a degraded slide or shows a user-facing error — it does not crash
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 04-01-PLAN.md -- Schema parser and prompt builder services with unit tests
+- [ ] 04-02-PLAN.md -- ChatPanel integration with Create Slide button and end-to-end verification
 
 ### Phase 5: Chart Rendering
 **Goal**: Bar, line, and pie chart data from Cube AI JSON is rendered as correctly sized images and inserted into slides
@@ -84,7 +87,10 @@ Plans:
   2. Line charts and pie charts are rendered correctly from Cube AI data using the same pipeline
   3. Charts are inserted via ShapeFill.setImage() on a geometric shape (GA path) and the code includes addPicture() as a detectable enhancement for Preview-capable environments
   4. Chart images are rendered at sufficient resolution (~800x600px) to be legible when displayed on a standard slide
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 04-01-PLAN.md -- Schema parser and prompt builder services with unit tests
+- [ ] 04-02-PLAN.md -- ChatPanel integration with Create Slide button and end-to-end verification
 
 ### Phase 6: Polish and Demo Readiness
 **Goal**: The demo experience is complete — multi-turn conversation, streaming partial results, multi-slide output, and hardened error handling
@@ -95,7 +101,10 @@ Plans:
   2. User can refine a previous result ("change to pie chart") without starting a new conversation
   3. Streaming partial AI text is visible in the taskpane as the response arrives, not only after completion
   4. A complex query (e.g., quarterly review) produces a coherent multi-slide section with consistent visual styling and logical flow between slides
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 04-01-PLAN.md -- Schema parser and prompt builder services with unit tests
+- [ ] 04-02-PLAN.md -- ChatPanel integration with Create Slide button and end-to-end verification
 
 ## Progress
 
@@ -109,6 +118,6 @@ Note: Phase 2 and Phase 3 have no dependency on each other — both depend only 
 | 1. Foundation | 2/2 | Complete | 2026-03-23 |
 | 2. Slide Primitives | 3/3 | Complete |  |
 | 3. Cube AI Integration | 2/2 | Complete   | 2026-03-24 |
-| 4. Schema and End-to-End Pipeline | 0/TBD | Not started | - |
+| 4. Schema and End-to-End Pipeline | 0/2 | Planned | - |
 | 5. Chart Rendering | 0/TBD | Not started | - |
 | 6. Polish and Demo Readiness | 0/TBD | Not started | - |
