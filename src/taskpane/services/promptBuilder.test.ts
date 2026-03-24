@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildSlidePrompt } from "./promptBuilder";
+import { buildSlidePrompt, buildGuidedPrompt } from "./promptBuilder";
 
 describe("buildSlidePrompt", () => {
   const userQuestion = "What are Q2 revenues?";
@@ -32,5 +32,40 @@ describe("buildSlidePrompt", () => {
     const prompt2 = buildSlidePrompt("Show me APAC sales");
     expect(prompt2).toContain("Show me APAC sales");
     expect(prompt2).not.toContain("What are Q2 revenues?");
+  });
+});
+
+describe("buildGuidedPrompt", () => {
+  it("contains brand name", () => {
+    const result = buildGuidedPrompt("Red Bull", "range review");
+    expect(result).toContain("Red Bull");
+  });
+
+  it("contains purpose", () => {
+    const result = buildGuidedPrompt("Red Bull", "range review");
+    expect(result).toContain("range review");
+  });
+
+  it("contains all 4 layout type definitions", () => {
+    const result = buildGuidedPrompt("Test", "test");
+    expect(result).toContain("text-only");
+    expect(result).toContain("chart-text");
+    expect(result).toContain("table-text");
+    expect(result).toContain("full-combination");
+  });
+
+  it("instructs Cube AI to return ONLY JSON", () => {
+    const result = buildGuidedPrompt("Test", "test");
+    expect(result).toContain("ONLY JSON");
+  });
+
+  it("instructs Cube AI NOT to include chartImageBase64", () => {
+    const result = buildGuidedPrompt("Test", "test");
+    expect(result).toContain("chartImageBase64");
+  });
+
+  it("is under 2000 characters", () => {
+    const result = buildGuidedPrompt("Very Long Brand Name", "comprehensive performance analysis");
+    expect(result.length).toBeLessThan(2000);
   });
 });
