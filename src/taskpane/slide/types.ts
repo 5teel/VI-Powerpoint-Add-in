@@ -57,3 +57,18 @@ export type SlideContent =
   | ChartTextContent
   | TableTextContent
   | FullCombinationContent;
+
+// --- Guided slide builder types ---
+
+/** Data collected by the wizard across all steps. */
+export interface WizardData {
+  brandName: string;
+  productImageBase64: string | null;
+  purpose: string;
+}
+
+/** Wizard step number (1=Brand, 2=Image, 3=Purpose, 4=Review). */
+export type WizardStep = 1 | 2 | 3 | 4;
+
+/** Build lifecycle state for the guided slide builder. */
+export type BuildState = "idle" | "building" | "built" | "failed";

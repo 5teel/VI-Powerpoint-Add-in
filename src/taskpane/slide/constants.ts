@@ -80,6 +80,9 @@ export const FULL_COMBINATION = {
   CALLOUT: { left: 36, top: 404, width: 888, height: 100 } as LayoutRegion,
 } as const;
 
+/** Product image region — reuses CHART_TEXT.CHART position for consistent layout (D-07). */
+export const IMAGE_REGION: LayoutRegion = { left: 36, top: 100, width: 528, height: 380 };
+
 // --- Adaptive scaling (D-01) ---
 
 /**

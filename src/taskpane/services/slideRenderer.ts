@@ -12,6 +12,7 @@ import {
   CHART_TEXT,
   TABLE_TEXT,
   FULL_COMBINATION,
+  IMAGE_REGION,
   adaptLayout,
 } from "../slide/constants";
 import { addTitle, addBody, addCalloutBox, addSummaryText } from "../slide/textRenderer";
@@ -31,7 +32,7 @@ import { detectSlideWidth, addSlideAtCurrentPosition } from "../slide/layoutEngi
  * All shapes are created within a single PowerPoint.run() call for performance.
  * Layout regions are adapted for the detected slide width (D-01).
  */
-export async function insertSlide(content: SlideContent): Promise<void> {
+export async function insertSlide(content: SlideContent, productImageBase64?: string): Promise<void> {
   await PowerPoint.run(async (context) => {
     // Detect slide dimensions for adaptive layout (D-01)
     const slideWidth = await detectSlideWidth(context);
@@ -88,6 +89,23 @@ export async function insertSlide(content: SlideContent): Promise<void> {
         addCalloutBox(shapes, content.insight, calloutRegion);
         break;
       }
+    }
+
+    // Add product image if provided (D-07)
+    if (productImageBase64) {
+      const imageRegion = adaptLayout(IMAGE_REGION, slideWidth);
+      const imgShape = shapes.addGeometricShape(
+        PowerPoint.GeometricShapeType.rectangle,
+        {
+          left: imageRegion.left,
+          top: imageRegion.top,
+          width: imageRegion.width,
+          height: imageRegion.height,
+        }
+      );
+      imgShape.fill.setImage(productImageBase64);
+      imgShape.lineFormat.weight = 0;
+      imgShape.altTextDescription = "Product image";
     }
 
     // Commit all shapes to PowerPoint in a single sync
