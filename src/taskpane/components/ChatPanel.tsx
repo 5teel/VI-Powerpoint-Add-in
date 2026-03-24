@@ -1,70 +1,96 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   Input,
   Button,
   Spinner,
-  Badge,
-  Card,
-  CardHeader,
   MessageBar,
   MessageBarBody,
+  MessageBarActions,
   Text,
 } from "@fluentui/react-components";
-import { streamCubeAI, CubeAIStreamResult, CubeAIError } from "../services/cubeai";
+import { streamCubeAI, StreamPhase, CubeAIStreamResult, CubeAIError } from "../services/cubeai";
 
 const SUMMIT_NAVY = "#0F1330";
 
-type PanelState = "idle" | "loading" | "success" | "error";
-
-interface LegacyResult {
-  success: boolean;
-  content?: string;
-  error?: string;
-  responseTimeMs?: number;
+interface ChatMessage {
+  role: "user" | "assistant" | "error";
+  content: string;
+  error?: CubeAIError;
 }
 
+const PHASE_LABELS: Record<StreamPhase, string> = {
+  connecting: "Connecting to Cube AI...",
+  connected: "Analyzing your question...",
+  streaming: "Generating response...",
+  complete: "",
+};
+
 const ChatPanel: React.FC = () => {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [streamingContent, setStreamingContent] = useState<string>("");
+  const [phase, setPhase] = useState<StreamPhase | null>(null);
   const [query, setQuery] = useState("");
-  const [panelState, setPanelState] = useState<PanelState>("idle");
-  const [result, setResult] = useState<LegacyResult | null>(null);
+  const [lastQuestion, setLastQuestion] = useState<string>("");
+  const [chatId, setChatId] = useState<string | null>(null);
+  const controllerRef = useRef<AbortController | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  const handleSubmit = async () => {
-    if (!query.trim() || panelState === "loading") return;
-    setPanelState("loading");
-    setResult(null);
+  // Abort in-flight request on unmount (Pitfall 2)
+  useEffect(() => {
+    return () => {
+      controllerRef.current?.abort();
+    };
+  }, []);
 
-    const startTime = performance.now();
-    streamCubeAI(query.trim(), null, {
-      onPhaseChange: () => {},
-      onContent: () => {},
-      onComplete: (streamResult: CubeAIStreamResult) => {
-        const elapsed = Math.round(performance.now() - startTime);
-        setResult({
-          success: true,
-          content: streamResult.content.substring(0, 500),
-          responseTimeMs: elapsed,
-        });
-        setPanelState("success");
-      },
-      onError: (err: CubeAIError) => {
-        setResult({ success: false, error: err.message });
-        setPanelState("error");
-      },
-    });
-  };
+  // Auto-scroll to bottom when messages or streaming content change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, streamingContent, phase]);
+
+  const handleSubmit = useCallback(
+    (question: string) => {
+      if (!question.trim() || phase !== null) return;
+
+      setLastQuestion(question);
+      setMessages((prev) => [...prev, { role: "user", content: question }]);
+      setQuery("");
+      setStreamingContent("");
+
+      const controller = streamCubeAI(question, chatId, {
+        onPhaseChange: (p: StreamPhase) => setPhase(p),
+        onContent: (content: string) => setStreamingContent(content),
+        onComplete: (result: CubeAIStreamResult) => {
+          setMessages((prev) => [...prev, { role: "assistant", content: result.content }]);
+          setStreamingContent("");
+          setPhase(null);
+          if (result.chatId) setChatId(result.chatId);
+        },
+        onError: (error: CubeAIError) => {
+          setMessages((prev) => [...prev, { role: "error", content: error.message, error }]);
+          setStreamingContent("");
+          setPhase(null);
+        },
+      });
+
+      controllerRef.current = controller;
+    },
+    [phase, chatId]
+  );
+
+  const handleRetry = useCallback(() => {
+    if (lastQuestion) handleSubmit(lastQuestion);
+  }, [lastQuestion, handleSubmit]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit();
+      handleSubmit(query.trim());
     }
   };
 
-  const isSubmitting = panelState === "loading";
-
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
-      {/* Response area */}
+      {/* Message area */}
       <div
         style={{
           flex: 1,
@@ -72,77 +98,103 @@ const ChatPanel: React.FC = () => {
           padding: "16px",
           display: "flex",
           flexDirection: "column",
-          gap: "12px",
+          gap: "4px",
         }}
       >
-        {panelState === "idle" && (
+        {/* Welcome state */}
+        {messages.length === 0 && !phase && (
           <div style={{ textAlign: "center", marginTop: "48px" }}>
             <Text weight="semibold" size={400} block>
-              Test Cube AI Connection
+              Ask a question about your data
             </Text>
             <Text size={300} style={{ color: "#616161", marginTop: "8px", display: "block" }}>
-              Type a question below to verify the API connection is working.
+              Type a question below and Cube AI will generate insights.
             </Text>
           </div>
         )}
 
-        {panelState === "loading" && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              justifyContent: "center",
-              marginTop: "48px",
-            }}
-          >
-            <Spinner size="small" label="Connecting to Cube AI..." />
+        {/* Message list */}
+        {messages.map((msg, i) => (
+          <div key={i}>
+            {msg.role === "user" && (
+              <div style={{ textAlign: "right", marginBottom: "12px" }}>
+                <div
+                  style={{
+                    display: "inline-block",
+                    backgroundColor: SUMMIT_NAVY,
+                    color: "white",
+                    padding: "8px 12px",
+                    borderRadius: "8px",
+                    maxWidth: "85%",
+                    textAlign: "left",
+                  }}
+                >
+                  <Text size={300} style={{ color: "white" }}>
+                    {msg.content}
+                  </Text>
+                </div>
+              </div>
+            )}
+            {msg.role === "assistant" && (
+              <div style={{ marginBottom: "12px" }}>
+                <div
+                  style={{
+                    backgroundColor: "#F5F5F5",
+                    padding: "8px 12px",
+                    borderRadius: "8px",
+                    maxWidth: "85%",
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                  }}
+                >
+                  <Text size={300}>{msg.content}</Text>
+                </div>
+              </div>
+            )}
+            {msg.role === "error" && (
+              <div style={{ marginBottom: "12px" }}>
+                <MessageBar intent="warning">
+                  <MessageBarBody>{msg.content}</MessageBarBody>
+                  <MessageBarActions>
+                    {msg.error?.retryable && (
+                      <Button size="small" onClick={handleRetry}>
+                        Try again
+                      </Button>
+                    )}
+                  </MessageBarActions>
+                </MessageBar>
+              </div>
+            )}
+          </div>
+        ))}
+
+        {/* Streaming content (in progress) */}
+        {streamingContent && (
+          <div style={{ marginBottom: "12px" }}>
+            <div
+              style={{
+                backgroundColor: "#F5F5F5",
+                padding: "8px 12px",
+                borderRadius: "8px",
+                maxWidth: "85%",
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+              }}
+            >
+              <Text size={300}>{streamingContent}</Text>
+            </div>
           </div>
         )}
 
-        {panelState === "success" && result && (
-          <Card>
-            <CardHeader
-              header={
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <Badge color="success" shape="rounded">
-                    Connected
-                  </Badge>
-                  <Text weight="semibold">Connection Successful</Text>
-                </div>
-              }
-              description={`Cube AI responded in ${result.responseTimeMs}ms. CORS is working.`}
-            />
-            <div style={{ padding: "0 16px 16px" }}>
-              <Text size={200} style={{ color: "#616161", display: "block", marginBottom: "4px" }}>
-                Response preview:
-              </Text>
-              <div
-                style={{
-                  backgroundColor: "#F5F5F5",
-                  padding: "8px",
-                  borderRadius: "4px",
-                  fontSize: "12px",
-                  lineHeight: "16px",
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                  maxHeight: "200px",
-                  overflowY: "auto",
-                }}
-              >
-                {result.content || "(empty response)"}
-              </div>
-            </div>
-          </Card>
+        {/* Phase-based spinner (per D-07, D-08) */}
+        {phase && phase !== "complete" && (
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 0" }}>
+            <Spinner size="small" label={PHASE_LABELS[phase]} />
+          </div>
         )}
 
-        {panelState === "error" && result && (
-          <MessageBar intent="error">
-            <MessageBarBody>
-              {result.error || "Something went wrong. Try again or check the browser console for details."}
-            </MessageBarBody>
-          </MessageBar>
-        )}
+        {/* Auto-scroll anchor */}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Input area */}
@@ -157,23 +209,23 @@ const ChatPanel: React.FC = () => {
       >
         <Input
           style={{ flex: 1 }}
-          placeholder="Ask a question to test the connection..."
+          placeholder="Ask a question about your data..."
           value={query}
           onChange={(_, data) => setQuery(data.value)}
           onKeyDown={handleKeyDown}
-          disabled={isSubmitting}
+          disabled={phase !== null}
         />
         <Button
           appearance="primary"
-          disabled={!query.trim() || isSubmitting}
-          onClick={handleSubmit}
+          disabled={!query.trim() || phase !== null}
+          onClick={() => handleSubmit(query.trim())}
           style={{
-            backgroundColor: !query.trim() || isSubmitting ? undefined : SUMMIT_NAVY,
+            backgroundColor: !query.trim() || phase !== null ? undefined : SUMMIT_NAVY,
             minWidth: "100px",
             minHeight: "32px",
           }}
         >
-          Send Query
+          Send
         </Button>
       </div>
     </div>
