@@ -49,8 +49,8 @@ export function addTable(
     return [...row, ...Array(colCount - row.length).fill("")];
   });
 
-  // Cap at 15 rows to prevent slide overflow
-  const cappedRows = normalizedRows.slice(0, 15);
+  // Cap at 10 rows to prevent slide overflow
+  const cappedRows = normalizedRows.slice(0, 10);
   const rowCount = cappedRows.length + 1; // +1 for header row
 
   // Build values 2D array: header row + formatted data rows

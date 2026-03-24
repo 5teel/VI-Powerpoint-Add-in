@@ -12,7 +12,8 @@ import {
   CHART_TEXT,
   TABLE_TEXT,
   FULL_COMBINATION,
-  IMAGE_REGION,
+  WITH_IMAGE,
+  IMAGE_TABLE_MAX_ROWS,
   adaptLayout,
 } from "../slide/constants";
 import { addTitle, addBody, addCalloutBox, addSummaryText } from "../slide/textRenderer";
@@ -41,71 +42,74 @@ export async function insertSlide(content: SlideContent, productImageBase64?: st
     const slide = await addSlideAtCurrentPosition(context);
     const shapes = slide.shapes;
 
-    switch (content.type) {
-      case "text-only": {
-        const titleRegion = adaptLayout(TEXT_ONLY.TITLE, slideWidth);
-        const bodyRegion = adaptLayout(TEXT_ONLY.BODY, slideWidth);
-        const calloutRegion = adaptLayout(TEXT_ONLY.CALLOUT, slideWidth);
-
-        addTitle(shapes, content.title, titleRegion);
-        addBody(shapes, content.bullets, bodyRegion);
-        addCalloutBox(shapes, content.insight, calloutRegion);
-        break;
-      }
-
-      case "chart-text": {
-        const titleRegion = adaptLayout(CHART_TEXT.TITLE, slideWidth);
-        const chartRegion = adaptLayout(CHART_TEXT.CHART, slideWidth);
-        const textRegion = adaptLayout(CHART_TEXT.TEXT, slideWidth);
-        const calloutRegion = adaptLayout(CHART_TEXT.CALLOUT, slideWidth);
-
-        addTitle(shapes, content.title, titleRegion);
-        addChartPlaceholder(shapes, chartRegion);
-        addBody(shapes, content.summaryBullets, textRegion);
-        addCalloutBox(shapes, content.insight, calloutRegion);
-        break;
-      }
-
-      case "table-text": {
-        const titleRegion = adaptLayout(TABLE_TEXT.TITLE, slideWidth);
-        const tableRegion = adaptLayout(TABLE_TEXT.TABLE, slideWidth);
-        const summaryRegion = adaptLayout(TABLE_TEXT.SUMMARY, slideWidth);
-
-        addTitle(shapes, content.title, titleRegion);
-        addTable(shapes, content.headers, content.rows, tableRegion);
-        addSummaryText(shapes, content.summary, summaryRegion);
-        break;
-      }
-
-      case "full-combination": {
-        const titleRegion = adaptLayout(FULL_COMBINATION.TITLE, slideWidth);
-        const chartRegion = adaptLayout(FULL_COMBINATION.CHART, slideWidth);
-        const tableRegion = adaptLayout(FULL_COMBINATION.TABLE, slideWidth);
-        const calloutRegion = adaptLayout(FULL_COMBINATION.CALLOUT, slideWidth);
-
-        addTitle(shapes, content.title, titleRegion);
-        addChartPlaceholder(shapes, chartRegion);
-        addTable(shapes, content.headers, content.rows, tableRegion);
-        addCalloutBox(shapes, content.insight, calloutRegion);
-        break;
-      }
-    }
-
-    // Add product image if provided (D-07)
+    // When a product image is provided, use the image-aware layout
+    // to prevent overlap: image left, content right, insight below.
     if (productImageBase64) {
-      const imageRegion = adaptLayout(IMAGE_REGION, slideWidth);
+      addTitle(shapes, content.title, adaptLayout(TEXT_ONLY.TITLE, slideWidth));
+
+      // Product image on the left
+      const imageRegion = adaptLayout(WITH_IMAGE.IMAGE, slideWidth);
       const imgShape = shapes.addGeometricShape(
         PowerPoint.GeometricShapeType.rectangle,
-        {
-          left: imageRegion.left,
-          top: imageRegion.top,
-          width: imageRegion.width,
-          height: imageRegion.height,
-        }
+        { left: imageRegion.left, top: imageRegion.top, width: imageRegion.width, height: imageRegion.height }
       );
       imgShape.fill.setImage(productImageBase64);
       imgShape.lineFormat.weight = 0;
       imgShape.altTextDescription = "Product image";
+
+      // Content on the right (table or bullets depending on type)
+      switch (content.type) {
+        case "text-only":
+          addBody(shapes, content.bullets, adaptLayout(WITH_IMAGE.BODY, slideWidth));
+          addCalloutBox(shapes, content.insight, adaptLayout(WITH_IMAGE.INSIGHT, slideWidth));
+          break;
+        case "chart-text":
+          addBody(shapes, content.summaryBullets, adaptLayout(WITH_IMAGE.BODY, slideWidth));
+          addCalloutBox(shapes, content.insight, adaptLayout(WITH_IMAGE.INSIGHT, slideWidth));
+          break;
+        case "table-text": {
+          const cappedRows = content.rows.slice(0, IMAGE_TABLE_MAX_ROWS);
+          addTable(shapes, content.headers, cappedRows, adaptLayout(WITH_IMAGE.TABLE, slideWidth));
+          addSummaryText(shapes, content.summary, adaptLayout(WITH_IMAGE.INSIGHT, slideWidth));
+          break;
+        }
+        case "full-combination": {
+          const cappedRows = content.rows.slice(0, IMAGE_TABLE_MAX_ROWS);
+          addTable(shapes, content.headers, cappedRows, adaptLayout(WITH_IMAGE.TABLE, slideWidth));
+          addCalloutBox(shapes, content.insight, adaptLayout(WITH_IMAGE.INSIGHT, slideWidth));
+          break;
+        }
+      }
+    } else {
+      // No product image — use standard layouts
+      switch (content.type) {
+        case "text-only": {
+          addTitle(shapes, content.title, adaptLayout(TEXT_ONLY.TITLE, slideWidth));
+          addBody(shapes, content.bullets, adaptLayout(TEXT_ONLY.BODY, slideWidth));
+          addCalloutBox(shapes, content.insight, adaptLayout(TEXT_ONLY.CALLOUT, slideWidth));
+          break;
+        }
+        case "chart-text": {
+          addTitle(shapes, content.title, adaptLayout(CHART_TEXT.TITLE, slideWidth));
+          addChartPlaceholder(shapes, adaptLayout(CHART_TEXT.CHART, slideWidth));
+          addBody(shapes, content.summaryBullets, adaptLayout(CHART_TEXT.TEXT, slideWidth));
+          addCalloutBox(shapes, content.insight, adaptLayout(CHART_TEXT.CALLOUT, slideWidth));
+          break;
+        }
+        case "table-text": {
+          addTitle(shapes, content.title, adaptLayout(TABLE_TEXT.TITLE, slideWidth));
+          addTable(shapes, content.headers, content.rows, adaptLayout(TABLE_TEXT.TABLE, slideWidth));
+          addSummaryText(shapes, content.summary, adaptLayout(TABLE_TEXT.SUMMARY, slideWidth));
+          break;
+        }
+        case "full-combination": {
+          addTitle(shapes, content.title, adaptLayout(FULL_COMBINATION.TITLE, slideWidth));
+          addChartPlaceholder(shapes, adaptLayout(FULL_COMBINATION.CHART, slideWidth));
+          addTable(shapes, content.headers, content.rows, adaptLayout(FULL_COMBINATION.TABLE, slideWidth));
+          addCalloutBox(shapes, content.insight, adaptLayout(FULL_COMBINATION.CALLOUT, slideWidth));
+          break;
+        }
+      }
     }
 
     // Commit all shapes to PowerPoint in a single sync

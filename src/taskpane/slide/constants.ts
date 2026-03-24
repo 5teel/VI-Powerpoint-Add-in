@@ -80,8 +80,20 @@ export const FULL_COMBINATION = {
   CALLOUT: { left: 36, top: 404, width: 888, height: 100 } as LayoutRegion,
 } as const;
 
-/** Product image region — reuses CHART_TEXT.CHART position for consistent layout (D-07). */
-export const IMAGE_REGION: LayoutRegion = { left: 36, top: 100, width: 528, height: 380 };
+/**
+ * Layout regions when a product image is present.
+ * Image on left, table/content on right, insight below.
+ * Designed to prevent overlap between all three elements.
+ */
+export const WITH_IMAGE = {
+  IMAGE: { left: 36, top: 100, width: 280, height: 300 } as LayoutRegion,
+  TABLE: { left: 340, top: 100, width: 584, height: 260 } as LayoutRegion,
+  BODY: { left: 340, top: 100, width: 584, height: 260 } as LayoutRegion,
+  INSIGHT: { left: 36, top: 420, width: 888, height: 84 } as LayoutRegion,
+} as const;
+
+/** Max rows for tables when product image is present (to prevent overflow). */
+export const IMAGE_TABLE_MAX_ROWS = 8;
 
 // --- Adaptive scaling (D-01) ---
 
