@@ -41,10 +41,20 @@ export function addTable(
   region: LayoutRegion
 ): PowerPoint.Shape {
   const colCount = headers.length;
-  const rowCount = rows.length + 1; // +1 for header row
+
+  // Normalize rows: pad short rows with empty strings, trim long rows to match header count
+  const normalizedRows = rows.map((row) => {
+    if (row.length === colCount) return row;
+    if (row.length > colCount) return row.slice(0, colCount);
+    return [...row, ...Array(colCount - row.length).fill("")];
+  });
+
+  // Cap at 15 rows to prevent slide overflow
+  const cappedRows = normalizedRows.slice(0, 15);
+  const rowCount = cappedRows.length + 1; // +1 for header row
 
   // Build values 2D array: header row + formatted data rows
-  const formattedRows = rows.map((row) =>
+  const formattedRows = cappedRows.map((row) =>
     row.map((cell) => formatCellValue(cell))
   );
 
@@ -72,7 +82,7 @@ export function addTable(
   specificCellProperties.push(headerRowProps);
 
   // Body row properties
-  for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+  for (let rowIndex = 0; rowIndex < cappedRows.length; rowIndex++) {
     const isEvenRow = rowIndex % 2 === 0;
     const rowProps: PowerPoint.TableCellProperties[] = formattedRows[rowIndex].map(
       (cell) => ({

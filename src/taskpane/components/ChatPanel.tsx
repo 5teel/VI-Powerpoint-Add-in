@@ -113,8 +113,9 @@ const ChatPanel: React.FC = () => {
         i === messageIndex ? { ...m, slideState: "created" as const } : m
       ));
     } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
       setMessages(prev => prev.map((m, i) =>
-        i === messageIndex ? { ...m, slideState: "failed" as const } : m
+        i === messageIndex ? { ...m, slideState: "failed" as const, error: { message: errMsg, type: "unknown" as const, retryable: false } } : m
       ));
     }
   }, [messages]);
@@ -251,7 +252,7 @@ const ChatPanel: React.FC = () => {
                 {msg.slideState === "failed" && (
                   <div style={{ marginTop: "4px" }}>
                     <Text size={200} style={{ color: "#D13438" }}>
-                      Failed to create slide
+                      Failed to create slide{msg.error?.message ? `: ${msg.error.message}` : ""}
                     </Text>
                     <Button
                       size="small"
