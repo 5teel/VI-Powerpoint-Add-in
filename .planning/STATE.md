@@ -23,8 +23,8 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 
 ## Current Position
 
-Phase: 04.2 (deployment) — DISCUSSING
-Plan: 0 of TBD
+Phase: 04.2 (deployment) — EXECUTING
+Plan: 1 of 2
 
 ## Performance Metrics
 
@@ -56,6 +56,7 @@ Plan: 0 of TBD
 | Phase 04 P02 | 2 | 2 tasks | 1 files |
 | Phase 04.1 P01 | 5min | 2 tasks | 7 files |
 | Phase 04.1 P02 | 3min | 2 tasks | 7 files |
+| Phase 04.2 P01 | 4min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,9 @@ Recent decisions affecting current work:
 - [Phase 04.1]: IMAGE_REGION reuses CHART_TEXT.CHART position for layout consistency
 - [Phase 04.1]: Used vi.stubGlobal for FileReader/Image mocking in node test environment
 - [Phase 04.1]: display:none pattern for tab switching preserves wizard state without lifting state to App
+- [Phase 04.2]: DefinePlugin with JSON.stringify for build-time config injection replacing hardcoded secrets
+- [Phase 04.2]: npm ci --ignore-scripts in Docker to avoid sharp native module build errors on Alpine
+- [Phase 04.2]: envsubst at container CMD time for Railway dynamic PORT injection
 
 ### Roadmap Evolution
 
@@ -104,5 +108,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-30T04:35:45.068Z
-Stopped at: Phase 4.2 planned — ready to execute
-Resume file: .planning/phases/04.2-deployment/04.2-01-PLAN.md
+Stopped at: Completed 04.2-01-PLAN.md (deployment preparation)
+Resume file: .planning/phases/04.2-deployment/04.2-02-PLAN.md

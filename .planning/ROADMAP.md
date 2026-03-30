@@ -106,7 +106,7 @@ Plans:
   4. Add-in loads and functions correctly in PowerPoint when sideloaded from the remote URL
 **Plans**: 2 plans
 Plans:
-- [ ] 04.2-01-PLAN.md -- Build config refactor (DefinePlugin, Dockerfile, nginx, .gitignore, manifest updates)
+- [x] 04.2-01-PLAN.md -- Build config refactor (DefinePlugin, Dockerfile, nginx, .gitignore, manifest updates)
 - [ ] 04.2-02-PLAN.md -- GitHub push, Railway deployment, and end-to-end PowerPoint verification
 
 ### Phase 5: Chart Rendering
