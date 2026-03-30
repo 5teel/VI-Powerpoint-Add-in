@@ -104,7 +104,10 @@ Plans:
   2. Add-in static files are deployed to Railway with HTTPS
   3. Manifest points to Railway URL instead of localhost:3100
   4. Add-in loads and functions correctly in PowerPoint when sideloaded from the remote URL
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 04.2-01-PLAN.md -- Build config refactor (DefinePlugin, Dockerfile, nginx, .gitignore, manifest updates)
+- [ ] 04.2-02-PLAN.md -- GitHub push, Railway deployment, and end-to-end PowerPoint verification
 
 ### Phase 5: Chart Rendering
 **Goal**: Bar, line, and pie chart data from Cube AI JSON is rendered as correctly sized images and inserted into slides
@@ -142,6 +145,6 @@ Note: Phase 2 and Phase 3 have no dependency on each other — both depend only 
 | 3. Cube AI Integration | 2/2 | Complete   | 2026-03-24 |
 | 4. Schema and End-to-End Pipeline | 2/2 | Complete   | 2026-03-24 |
 | 4.1. Guided Slide Builder | 2/2 | Complete | 2026-03-30 |
-| 4.2. Deployment | 0/TBD | Not started | - |
+| 4.2. Deployment | 0/2 | Not started | - |
 | 5. Chart Rendering | 0/TBD | Not started | - |
 | 6. Polish and Demo Readiness | 0/TBD | Not started | - |
