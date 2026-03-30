@@ -6,7 +6,7 @@ const CopyWebpackPlugin = require("copy-webpack-plugin");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 
 const urlDev = "https://localhost:3100/";
-const urlProd = "https://summit-vi.up.railway.app/";
+const urlProd = "https://vi-powerpoint-add-in-production.up.railway.app/";
 
 async function getHttpsOptions() {
   const httpsOptions = await devCerts.getHttpsServerOptions();
