@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase complete — ready for verification
-stopped_at: Phase 4.1 context gathered
-last_updated: "2026-03-24T08:45:09.798Z"
+status: Phase 4.1 complete — advancing to Phase 5
+stopped_at: "Phase 4.1 marked complete, discussing Phase 5"
+last_updated: "2026-03-24T09:13:44.844Z"
 progress:
-  total_phases: 7
-  completed_phases: 4
-  total_plans: 9
-  completed_plans: 9
+  total_phases: 8
+  completed_phases: 5
+  total_plans: 11
+  completed_plans: 11
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** User types a business question, gets a professionally laid-out PowerPoint slide with real data — no manual data pulling, no manual formatting
-**Current focus:** Phase 04 — schema-and-end-to-end-pipeline
+**Current focus:** Phase 04.2 — deployment
 
 ## Current Position
 
-Phase: 04 (schema-and-end-to-end-pipeline) — EXECUTING
-Plan: 2 of 2
+Phase: 04.2 (deployment) — DISCUSSING
+Plan: 0 of TBD
 
 ## Performance Metrics
 
@@ -54,6 +54,8 @@ Plan: 2 of 2
 | Phase 04 P01 | 3min | 2 tasks | 4 files |
 | Phase 04 P02 | 2min | 1 tasks | 1 files |
 | Phase 04 P02 | 2 | 2 tasks | 1 files |
+| Phase 04.1 P01 | 5min | 2 tasks | 7 files |
+| Phase 04.1 P02 | 3min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -81,6 +83,9 @@ Recent decisions affecting current work:
 - [Phase 04]: Per-message slideState field for independent Create Slide button lifecycle tracking
 - [Phase 04]: Per-message slideState field ('idle'|'creating'|'created'|'failed') tracks Create Slide button lifecycle independently per message — prevents duplicate slide creation without any global lock
 - [Phase 04]: Wrapped question (buildSlidePrompt) sent to Cube AI; original question stored in messages state — schema injection is transparent to the chat UI
+- [Phase 04.1]: IMAGE_REGION reuses CHART_TEXT.CHART position for layout consistency
+- [Phase 04.1]: Used vi.stubGlobal for FileReader/Image mocking in node test environment
+- [Phase 04.1]: display:none pattern for tab switching preserves wizard state without lifting state to App
 
 ### Roadmap Evolution
 
@@ -98,6 +103,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-24T08:45:09.784Z
-Stopped at: Phase 4.1 context gathered
-Resume file: .planning/phases/04.1-guided-slide-builder/04.1-CONTEXT.md
+Last session: 2026-03-30
+Stopped at: Phase 4.1 marked complete, discussing Phase 5
+Resume file: None
