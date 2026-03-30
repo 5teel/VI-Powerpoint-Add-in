@@ -1,11 +1,16 @@
 // Cube AI API configuration for Summit VI add-in
-// Per D-04: hardcoded config for internal demo. Replace with proper auth for client-facing release.
-// Webpack does not have dotenv-webpack or DefinePlugin configured, so values are hardcoded.
+// Values injected at build time via webpack DefinePlugin
+// In development: falls back to defaults for local dev
+// In production: Railway env vars are injected during Docker build
+
+declare const __CUBEAI_API_KEY__: string;
+declare const __CUBEAI_BASE_URL__: string;
+declare const __CUBEAI_EXTERNAL_ID__: string;
+declare const __CUBEAI_TIMEOUT_MS__: number;
 
 export const CUBEAI_CONFIG = {
-  baseUrl:
-    "https://ai.gcp-us-central1.cubecloud.dev/api/v1/public/summitinsights/agents/11/chat/stream-chat-state",
-  apiKey: "sk-c3VtbWl0aW5zaWdodHM6ZjAxZWIzMGZkZWIyYjFmNWE4YmRjOWMwYWNlZjNiZTU1MWIxNDhlNmRiMGJiN2Y5Nzk1YzI2ODk3ZjBjZDE0YQ==", // Replace with actual key before testing
-  internalId: "simon.scott@summitinsights.com",
-  timeoutMs: 180000,
+  baseUrl: __CUBEAI_BASE_URL__,
+  apiKey: __CUBEAI_API_KEY__,
+  internalId: __CUBEAI_EXTERNAL_ID__,
+  timeoutMs: __CUBEAI_TIMEOUT_MS__,
 };

@@ -1,11 +1,12 @@
 /* eslint-disable no-undef */
 
+const webpack = require("webpack");
 const devCerts = require("office-addin-dev-certs");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 
 const urlDev = "https://localhost:3100/";
-const urlProd = "https://www.contoso.com/"; // CHANGE THIS TO YOUR PRODUCTION DEPLOYMENT LOCATION
+const urlProd = "https://summit-vi.up.railway.app/";
 
 async function getHttpsOptions() {
   const httpsOptions = await devCerts.getHttpsServerOptions();
@@ -54,6 +55,12 @@ module.exports = async (env, options) => {
       ],
     },
     plugins: [
+      new webpack.DefinePlugin({
+        '__CUBEAI_API_KEY__': JSON.stringify(process.env.CUBEAI_API_KEY || ''),
+        '__CUBEAI_BASE_URL__': JSON.stringify(process.env.CUBEAI_BASE_URL || 'https://ai.gcp-us-central1.cubecloud.dev/api/v1/public/summitinsights/agents/11/chat/stream-chat-state'),
+        '__CUBEAI_EXTERNAL_ID__': JSON.stringify(process.env.CUBEAI_EXTERNAL_ID || ''),
+        '__CUBEAI_TIMEOUT_MS__': JSON.stringify(Number(process.env.CUBEAI_TIMEOUT_MS) || 180000),
+      }),
       new HtmlWebpackPlugin({
         filename: "taskpane.html",
         template: "./src/taskpane/taskpane.html",

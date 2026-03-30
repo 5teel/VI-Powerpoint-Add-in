@@ -25,3 +25,13 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+
+# Planning artifacts (local only)
+.planning/
+
+# Raw secret values
+src/taskpane/config.ts.txt
+config.ts.txt
+
+# Claude AI
+.claude/
