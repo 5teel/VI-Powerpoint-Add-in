@@ -20,6 +20,16 @@ export class UnsupportedSqlError extends Error {
 }
 
 const FORBIDDEN_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
+  // DDL/DML — explicitly forbidden so a crafted multi-statement payload like
+  // `SELECT ...; DROP TABLE t` surfaces by keyword label even after the trailing
+  // semicolon is stripped. See the comment-strip + post-; truncation below.
+  { pattern: /\bDROP\b/i, label: "DROP" },
+  { pattern: /\bDELETE\b/i, label: "DELETE" },
+  { pattern: /\bINSERT\b/i, label: "INSERT" },
+  { pattern: /\bUPDATE\b/i, label: "UPDATE" },
+  { pattern: /\bCREATE\b/i, label: "CREATE" },
+  { pattern: /\bALTER\b/i, label: "ALTER" },
+  { pattern: /\bTRUNCATE\b/i, label: "TRUNCATE" },
   { pattern: /\bJOIN\b/i, label: "JOIN" },
   { pattern: /\bWITH\s+\w+\s+AS\s*\(/i, label: "CTE" },
   { pattern: /\bHAVING\b/i, label: "HAVING" },
@@ -34,16 +44,31 @@ const FORBIDDEN_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
 const DATE_GRANULARITIES = new Set(["day", "week", "month", "quarter", "year", "hour", "minute", "second"]);
 
 export function translateSql(sqlQuery: string): CubeQuery {
-  const sql = sqlQuery.trim().replace(/;$/, "");
+  // 1. Strip SQL comments so a crafted /*JOIN*/ or --JOIN cannot hide keywords
+  //    from the forbidden-pattern gate.
+  // 2. Drop everything after the first ";" so multi-statement payloads like
+  //    `SELECT ...; DROP TABLE t` cannot sneak DDL past the gate via semicolon
+  //    stripping alone.
+  const sql = sqlQuery
+    .replace(/--[^\n]*/g, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .trim()
+    .replace(/;[\s\S]*$/, "");
+
+  // 3. Mask string literals before running the forbidden-pattern regexes so
+  //    legitimate content like `WHERE note = 'JOIN the team'` does not false-
+  //    positive. The parser below still operates on the original `sql` string
+  //    so quoted values reach downstream unmodified.
+  const masked = sql.replace(/'[^']*'/g, "''").replace(/"[^"]*"/g, '""');
 
   // Forbidden-shape gate
   for (const { pattern, label } of FORBIDDEN_PATTERNS) {
-    if (pattern.test(sql)) {
+    if (pattern.test(masked)) {
       throw new UnsupportedSqlError(label);
     }
   }
-  // Subquery detector: "(SELECT" anywhere
-  if (/\(\s*SELECT\b/i.test(sql)) {
+  // Subquery detector: "(SELECT" anywhere (masked so it doesn't match inside literals)
+  if (/\(\s*SELECT\b/i.test(masked)) {
     throw new UnsupportedSqlError("subquery");
   }
 
