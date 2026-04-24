@@ -159,6 +159,7 @@ export const SlidePreview: React.FC<SlidePreviewProps> = ({
           chartPngBase64 = await renderVegaToBase64Png({
             spec: plan.chartSpec,
             rows: cubeResponse.data,
+            signal: ac.signal,
           });
         }
         if (cancelled || ac.signal.aborted) return;
@@ -172,6 +173,9 @@ export const SlidePreview: React.FC<SlidePreviewProps> = ({
           chartPngBase64,
           tableSpec: buildComposedTableSpec(plan, cubeResponse.data, toolCall.input.tableChartSpec),
         };
+        // Pre-flight abort check — Office.js PowerPoint.run has no native abort
+        // primitive, so the minimum-safe pattern is to bail before invoking it.
+        if (cancelled || ac.signal.aborted) return;
         await insertSlide(composedContent);
         if (cancelled) return;
 

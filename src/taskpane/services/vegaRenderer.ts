@@ -32,6 +32,13 @@ export interface VegaRenderOptions {
   heightPx?: number;
   /** Pixel-density scale factor. Default: 2 (retina). */
   scaleFactor?: number;
+  /**
+   * Optional AbortSignal. When the signal is aborted, renderVegaToBase64Png
+   * throws an AbortError at the earliest checkpoint (before vega.parse, after
+   * view.runAsync, and before toDataURL). Vega itself has no abort primitive,
+   * so the in-flight runAsync completes, but the result is not returned.
+   */
+  signal?: AbortSignal;
 }
 
 /**
@@ -43,6 +50,9 @@ export interface VegaRenderOptions {
  * @returns Raw base64 string (NO "data:" prefix) suitable for ShapeFill.setImage.
  */
 export async function renderVegaToBase64Png(opts: VegaRenderOptions): Promise<string> {
+  // Pre-flight abort check — bail before parsing/compiling if already cancelled.
+  if (opts.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+
   // Shallow-clone the spec so we don't mutate the caller's object, and inject sizing.
   const specWithSize = {
     ...opts.spec,
@@ -60,6 +70,9 @@ export async function renderVegaToBase64Png(opts: VegaRenderOptions): Promise<st
   }
 
   await view.runAsync();
+
+  // Post-runAsync abort check — if the caller cancelled during render, drop the result.
+  if (opts.signal?.aborted) throw new DOMException("Aborted", "AbortError");
 
   const canvas = await view.toCanvas(opts.scaleFactor ?? 2);
   // In a browser, view.toCanvas returns HTMLCanvasElement. Under Vitest, tests
