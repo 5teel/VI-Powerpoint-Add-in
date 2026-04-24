@@ -60,6 +60,10 @@ module.exports = async (env, options) => {
         '__CUBEAI_BASE_URL__': JSON.stringify(process.env.CUBEAI_BASE_URL || 'https://ai.gcp-us-central1.cubecloud.dev/api/v1/public/summitinsights/agents/11/chat/stream-chat-state'),
         '__CUBEAI_EXTERNAL_ID__': JSON.stringify(process.env.CUBEAI_EXTERNAL_ID || ''),
         '__CUBEAI_TIMEOUT_MS__': JSON.stringify(Number(process.env.CUBEAI_TIMEOUT_MS) || 180000),
+        '__ANTHROPIC_API_KEY__': JSON.stringify(process.env.ANTHROPIC_API_KEY || ''),
+        '__ANTHROPIC_MODEL__': JSON.stringify(process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6'),
+        '__CUBE_DATA_BASE_URL__': JSON.stringify(process.env.CUBE_DATA_BASE_URL || ''),
+        '__CUBE_DATA_JWT__': JSON.stringify(process.env.CUBE_DATA_JWT || ''),
       }),
       new HtmlWebpackPlugin({
         filename: "taskpane.html",
