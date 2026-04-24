@@ -74,6 +74,16 @@ export async function composeSlide(
   input: ComposerInput,
   cb: ComposerCallbacks
 ): Promise<void> {
+  // Guard against double error dispatch: the SDK's stream.on("error") and the
+  // try/catch around await stream.finalMessage() can both fire for the same
+  // underlying failure. Only the first call propagates.
+  let errorReported = false;
+  const reportError = (err: Error): void => {
+    if (errorReported) return;
+    errorReported = true;
+    cb.onError(err);
+  };
+
   try {
     const stream = client.messages.stream(
       {
@@ -103,7 +113,7 @@ export async function composeSlide(
     stream.on("inputJson", (_delta: string, snapshot: unknown) => {
       cb.onPartialPlan(snapshot as Partial<CompositionPlan>);
     });
-    stream.on("error", (err: Error) => cb.onError(err));
+    stream.on("error", (err: Error) => reportError(err));
 
     const final = await stream.finalMessage();
     const toolUse = final.content.find(
@@ -113,6 +123,6 @@ export async function composeSlide(
     const parsed = CompositionPlanSchema.parse(toolUse.input);
     cb.onFinal(parsed);
   } catch (err) {
-    cb.onError(err as Error);
+    reportError(err as Error);
   }
 }
