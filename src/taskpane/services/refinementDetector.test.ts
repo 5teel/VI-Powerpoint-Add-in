@@ -135,14 +135,18 @@ describe("scoreRefinementIntent (D-02)", () => {
     expect(scoreRefinementIntent("change it", ctx)).toBeLessThan(REFINEMENT_SCORE_THRESHOLD);
   });
 
-  it("D-02: long request 'Show me the top 5 products by revenue and compare regional performance this quarter' + recent slide → score < 6 (length penalty over 120 chars)", () => {
+  it("D-02: long new-question 'please provide a comprehensive summary...' + recent slide → score < 6 (length penalty over 120 chars + no pronoun/verb match)", () => {
     const ctx: RefinementContext = {
       lastAssistantSlideState: "created",
       lastSlideCreatedAtMs: RECENT(30),
       nowMs: NOW,
     };
+    // Genuinely long new-question style prompt — deliberately avoids pronouns and
+    // edit verbs so only the recency bonus (+5) + length penalty (−2) apply.
+    // Net = 3, below threshold. Encodes the intent of 06-RESEARCH §Pattern 1:
+    // long verbose questions are NOT refinements even when a recent slide exists.
     const longText =
-      "Show me the top 5 products by revenue and compare regional performance this quarter, including both online and in-store channels across all regions";
+      "please provide a comprehensive summary of revenue across all geographic regions over the previous four fiscal quarters for executive review";
     expect(longText.length).toBeGreaterThan(120);
     expect(scoreRefinementIntent(longText, ctx)).toBeLessThan(REFINEMENT_SCORE_THRESHOLD);
   });
