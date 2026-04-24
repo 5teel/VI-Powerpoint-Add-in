@@ -5,8 +5,9 @@
  * whether the "Refining: [last slide title]" chip is shown above the composer.
  * Threshold locked at 6 per 06-UI-SPEC §Interaction Contracts §Refinement Detection.
  *
- * Date.now() must be passed in via ctx.nowMs (not called inside) so unit tests
- * can assert deterministic scores against fixed timestamps.
+ * The current time must be passed in via ctx.nowMs (never read from the system
+ * clock inside this function) so unit tests can assert deterministic scores
+ * against fixed timestamps.
  *
  * Scoring rules (06-RESEARCH §Pattern 1):
  *   +3  pronoun match — "it", "that", "this", "the chart|slide|table|commentary"
@@ -24,7 +25,7 @@ export interface RefinementContext {
   lastAssistantSlideState?: "created";
   /** Epoch ms at which the last slide was inserted; undefined when no prior slide. */
   lastSlideCreatedAtMs?: number;
-  /** Date.now() from the caller — injected for testability. */
+  /** Current wall-clock epoch ms from the caller — injected for testability. */
   nowMs: number;
 }
 

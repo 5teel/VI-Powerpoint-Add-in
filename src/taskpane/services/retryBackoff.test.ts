@@ -172,11 +172,17 @@ describe("retryWithBackoff (D-13)", () => {
       isRetryable: isAnthropicRateLimit,
       signal: ac.signal,
     });
-    // Drain timers; abort should short-circuit the wait.
+    // Attach handler BEFORE draining timers so the rejection is never
+    // classified as unhandled (fake timers rush the settlement ahead of the
+    // await expect chain).
+    const guarded = promise.catch((e) => e);
     await vi.runAllTimersAsync();
-    await expect(promise).rejects.toSatisfy((err: unknown) => {
-      return err instanceof Error && (err.name === "AbortError" || /abort/i.test(err.message));
-    });
+    const err = await guarded;
+    expect(err).toBeDefined();
+    expect(err instanceof Error).toBe(true);
+    expect(
+      (err as Error).name === "AbortError" || /abort/i.test((err as Error).message)
+    ).toBe(true);
     // fn called exactly once — we aborted inside attempt 1; attempt 2 never runs.
     expect(fn).toHaveBeenCalledTimes(1);
   });
