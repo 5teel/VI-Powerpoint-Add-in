@@ -25,12 +25,13 @@ function createMockStream(chunks: string[]): {
 }
 
 // Helper: create mock callbacks
-function createMockCallbacks(): StreamCallbacks {
+function createMockCallbacks(): Required<StreamCallbacks> {
   return {
     onPhaseChange: vi.fn(),
     onContent: vi.fn(),
     onComplete: vi.fn(),
     onError: vi.fn(),
+    onToolCall: vi.fn(),
   };
 }
 
@@ -261,5 +262,97 @@ describe("streamCubeAI", () => {
     expect(callbacks.onError).toHaveBeenCalledTimes(1);
     const error: CubeAIError = (callbacks.onError as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(error.type).toBe("empty");
+  });
+
+  it("invokes onToolCall for cubeSqlApi toolCalls with isInProcess:false", async () => {
+    const toolLine = JSON.stringify({
+      role: "tool",
+      toolCall: {
+        name: "cubeSqlApi",
+        isInProcess: false,
+        input: {
+          sqlQuery: "SELECT MEASURE(revenue) FROM sales_view",
+          queryTitle: "Revenue",
+          description: "Total revenue",
+          chartCategory: "vega",
+          vegaSpec: { mark: "bar" },
+        },
+      },
+    });
+    vi.stubGlobal("fetch", async () =>
+      createMockStream([
+        toolLine + "\n",
+        '{"role":"assistant","content":"done","isDelta":false,"isInProcess":false}\n',
+      ])
+    );
+
+    const callbacks = createMockCallbacks();
+    streamCubeAI("q", null, callbacks);
+    await waitForStream(callbacks);
+
+    expect(callbacks.onToolCall).toHaveBeenCalledTimes(1);
+    expect(callbacks.onToolCall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "cubeSqlApi",
+        isInProcess: false,
+        input: expect.objectContaining({ sqlQuery: expect.stringContaining("MEASURE(revenue)") }),
+      })
+    );
+  });
+
+  it("does not invoke onToolCall for isInProcess:true intermediate events", async () => {
+    const intermediateLine = JSON.stringify({
+      role: "tool",
+      toolCall: { name: "cubeSqlApi", isInProcess: true, input: {} },
+    });
+    vi.stubGlobal("fetch", async () =>
+      createMockStream([
+        intermediateLine + "\n",
+        '{"role":"assistant","content":"done","isDelta":false,"isInProcess":false}\n',
+      ])
+    );
+
+    const callbacks = createMockCallbacks();
+    streamCubeAI("q", null, callbacks);
+    await waitForStream(callbacks);
+
+    expect(callbacks.onToolCall).not.toHaveBeenCalled();
+  });
+
+  it("CMPS-03 grounding: delivers assistant content AND toolCall in the same stream (both fire before onComplete)", async () => {
+    const assistantLine = JSON.stringify({
+      role: "assistant",
+      content: "NSW contributed 33% of national sales, driven by metro density.",
+      isDelta: false,
+      isInProcess: false,
+    });
+    const toolLine = JSON.stringify({
+      role: "tool",
+      toolCall: {
+        name: "cubeSqlApi",
+        isInProcess: false,
+        input: {
+          sqlQuery: "SELECT MEASURE(revenue) FROM sales_view",
+          queryTitle: "Revenue",
+          description: "Total revenue",
+          chartCategory: "vega",
+          vegaSpec: { mark: "bar" },
+        },
+      },
+    });
+    vi.stubGlobal("fetch", async () =>
+      createMockStream([assistantLine + "\n", toolLine + "\n"])
+    );
+
+    const callbacks = createMockCallbacks();
+    streamCubeAI("q", null, callbacks);
+    await waitForStream(callbacks);
+
+    // BOTH must fire — the assistant commentary is the CMPS-03 grounding anchor
+    expect(callbacks.onContent).toHaveBeenCalled();
+    const contentCalls = (callbacks.onContent as ReturnType<typeof vi.fn>).mock.calls;
+    const lastContent = contentCalls[contentCalls.length - 1][0];
+    expect(lastContent).toMatch(/NSW contributed 33%/);
+    expect(callbacks.onToolCall).toHaveBeenCalledTimes(1);
   });
 });

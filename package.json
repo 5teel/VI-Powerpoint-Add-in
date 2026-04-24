@@ -24,15 +24,23 @@
     "start": "office-addin-debugging start manifest.xml",
     "stop": "office-addin-debugging stop manifest.xml",
     "validate": "office-addin-manifest validate manifest.xml",
-    "watch": "webpack --mode development --watch"
+    "watch": "webpack --mode development --watch",
+    "evals:judge": "tsx scripts/evals/runLlmJudge.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.0",
     "@fluentui/react-components": "9.73.4",
     "@fluentui/react-icons": "^2.0.258",
+    "ajv": "^8.18.0",
+    "ajv-formats": "^3.0.1",
     "core-js": "^3.36.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "regenerator-runtime": "^0.14.1"
+    "regenerator-runtime": "^0.14.1",
+    "vega": "^6.2.0",
+    "vega-lite": "^6.4.2",
+    "zod": "^3.25.76",
+    "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",
@@ -60,6 +68,7 @@
     "process": "^0.11.10",
     "source-map-loader": "^5.0.0",
     "style-loader": "^4.0.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.4.2",
     "vitest": "^4.1.1",
     "webpack": "^5.95.0",
