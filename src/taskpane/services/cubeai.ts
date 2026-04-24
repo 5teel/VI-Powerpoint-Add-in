@@ -3,6 +3,7 @@
 // Pattern source: C:\Development\Summit MCP Server - Claude\src\cubeai.ts
 
 import { CUBEAI_CONFIG } from "../config";
+import { logEvent } from "./telemetry";
 
 export type StreamPhase = "connecting" | "connected" | "streaming" | "complete";
 
@@ -167,6 +168,12 @@ export function streamCubeAI(
       let responseChatId: string | null = null;
       let lastFlush = 0;
       let firstDelta = true;
+      // Count JSON.parse failures across the NDJSON stream. We intentionally
+      // don't surface individual failures to callbacks (spamming would bury
+      // real errors), but a summary at stream-end lets telemetry detect when
+      // Cube AI starts emitting a different line format or when malformed
+      // toolCall payloads arrive consistently.
+      let parseFailures = 0;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -220,7 +227,8 @@ export function streamCubeAI(
               }
             }
           } catch {
-            // Skip unparseable lines
+            // Skip unparseable lines (counted for end-of-stream telemetry)
+            parseFailures++;
           }
         }
 
@@ -251,8 +259,15 @@ export function streamCubeAI(
             }
           }
         } catch {
-          // Skip unparseable remaining buffer
+          // Skip unparseable remaining buffer (counted for end-of-stream telemetry)
+          parseFailures++;
         }
+      }
+
+      // Surface cumulative NDJSON parse failures once per stream. Zero-count
+      // streams emit nothing, so the normal happy path stays quiet.
+      if (parseFailures > 0) {
+        logEvent("cubeai.parse_failures", { count: parseFailures });
       }
 
       // Always perform final un-throttled flush (Pitfall 4)
