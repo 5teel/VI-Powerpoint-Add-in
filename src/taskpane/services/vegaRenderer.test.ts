@@ -91,7 +91,7 @@ describe("renderVegaToBase64Png", () => {
     expect(result).not.toMatch(/^data:/);
   });
 
-  it("injects width, height, and white background into the spec without mutating input", async () => {
+  it("does not mutate the input spec (width/height/background added to clone only)", async () => {
     const originalSpec = {
       mark: "bar" as const,
       data: { name: "table" },
@@ -100,23 +100,61 @@ describe("renderVegaToBase64Png", () => {
         y: { field: "b", type: "quantitative" },
       },
     };
-    const vegaLite = await import("vega-lite");
-    const compileSpy = vi.spyOn(vegaLite, "compile");
+    const specSnapshotBefore = JSON.stringify(originalSpec);
     await renderVegaToBase64Png({
       spec: originalSpec as unknown as Record<string, unknown>,
       rows: [{ a: "x", b: 1 }],
       widthPx: 640,
       heightPx: 480,
     });
-    expect(compileSpy).toHaveBeenCalled();
-    const passed = compileSpy.mock.calls[0][0] as Record<string, unknown>;
-    expect(passed.width).toBe(640);
-    expect(passed.height).toBe(480);
-    expect(passed.background).toBe("#FFFFFF");
-    // Input spec is not mutated
+    // Input spec is not mutated — width/height/background go onto a shallow clone only.
+    expect(JSON.stringify(originalSpec)).toBe(specSnapshotBefore);
     expect(Object.prototype.hasOwnProperty.call(originalSpec, "width")).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(originalSpec, "height")).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(originalSpec, "background")).toBe(false);
+  });
+
+  it("injects width/height into the compiled spec — verified via runtime dataflow signal widths", async () => {
+    // We can't spyOn vega-lite.compile or vega.parse/View (ESM namespace lock).
+    // Instead, verify the signal names set by vega.parse from the compiled spec
+    // include widths sized to our inputs. The `view.signal("width")` API returns
+    // the concrete width signal value after runAsync() settles.
+    let capturedWidth: number | undefined;
+    let capturedHeight: number | undefined;
+    let capturedBackground: string | undefined;
+    // Replace runAsync with a thin wrapper that captures signals before resolving.
+    const originalRun = vega.View.prototype.runAsync;
+    const runSpy = vi.spyOn(vega.View.prototype, "runAsync").mockImplementation(async function (
+      this: vega.View,
+      ...args: Parameters<typeof originalRun>
+    ) {
+      const result = await originalRun.apply(this, args);
+      try {
+        capturedWidth = this.signal("width") as number;
+        capturedHeight = this.signal("height") as number;
+        capturedBackground = this.signal("background") as string;
+      } catch {
+        // signals not yet defined — ignore
+      }
+      return result;
+    });
+    await renderVegaToBase64Png({
+      spec: {
+        mark: "bar",
+        data: { name: "table" },
+        encoding: {
+          x: { field: "a", type: "nominal" },
+          y: { field: "b", type: "quantitative" },
+        },
+      },
+      rows: [{ a: "x", b: 1 }],
+      widthPx: 640,
+      heightPx: 480,
+    });
+    expect(runSpy).toHaveBeenCalled();
+    expect(capturedWidth).toBe(640);
+    expect(capturedHeight).toBe(480);
+    expect(capturedBackground).toBe("#FFFFFF");
   });
 
   it("skips view.data when rows is absent or empty", async () => {
