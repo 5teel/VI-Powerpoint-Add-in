@@ -519,27 +519,26 @@ describe("orchestrateSection", () => {
 /**
  * Helper: runs orchestrateSection and waits for either onAllDone or onPlanError.
  * Bounded by a 500ms timeout to avoid hanging tests on orchestrator bugs.
+ *
+ * Hooks into the EXISTING vi.fn() spies on cb.onAllDone / cb.onPlanError via
+ * mockImplementation so the caller's spy identity is preserved (`cb.onAllDone`
+ * stays the same fn reference and still records calls for assertions).
  */
 async function orchestrateSectionToCompletion(
   input: SectionOrchestratorInput,
   cb: SectionOrchestratorCallbacks
 ): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    const originalAllDone = cb.onAllDone as unknown as ReturnType<typeof vi.fn>;
-    const originalPlanError = cb.onPlanError as unknown as ReturnType<typeof vi.fn>;
+  const settle = new Promise<void>((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error("orchestrator timed out")), 500);
-    (cb as { onAllDone: () => void }).onAllDone = () => {
-      originalAllDone.call(cb);
+    const done = () => {
       clearTimeout(timeout);
       resolve();
     };
-    (cb as { onPlanError: (e: Error) => void }).onPlanError = (e) => {
-      originalPlanError.call(cb, e);
-      clearTimeout(timeout);
-      resolve();
-    };
-    orchestrateSection(input, cb);
+    (cb.onAllDone as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => done());
+    (cb.onPlanError as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => done());
   });
+  orchestrateSection(input, cb);
+  await settle;
   // Small drain tick for any trailing micro-task updates.
   await new Promise((r) => setTimeout(r, 0));
 }
