@@ -1,18 +1,34 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { TabList, Tab, SelectTabEvent, SelectTabData } from "@fluentui/react-components";
 import Header from "./Header";
 import ChatPanel from "./ChatPanel";
 import SlideTestPanel from "./SlideTestPanel";
 import WizardPanel from "./WizardPanel";
+import { SetupRequired } from "./SetupRequired";
+import { validateConfig } from "../config";
 
 type TabValue = "slides" | "chat" | "wizard";
 
 const App: React.FC = () => {
+  // Phase 6 D-14: credential validation at module-load. Values are frozen at
+  // bundle time via DefinePlugin, so a single useMemo([]) call is safe — the
+  // result cannot change over the lifetime of this component.
+  const missing = useMemo(() => validateConfig(), []);
+
   const [activeTab, setActiveTab] = useState<TabValue>("chat");
 
   const handleTabSelect = (_event: SelectTabEvent, data: SelectTabData) => {
     setActiveTab(data.value as TabValue);
   };
+
+  if (missing.length > 0) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+        <Header />
+        <SetupRequired missing={missing} />
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
