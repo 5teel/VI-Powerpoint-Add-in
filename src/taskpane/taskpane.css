@@ -8,3 +8,42 @@ html, body, #container {
   background: linear-gradient(165deg, #EEF1F8 0%, #E8ECF5 50%, #E2E7F2 100%);
   border-radius: 12px;
 }
+
+/* Phase 5 SlidePreview shimmer — custom (NOT Fluent Skeleton per 05-UI-SPEC.md) */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer-region {
+  background: linear-gradient(
+    90deg,
+    rgba(37, 99, 235, 0.08) 0%,
+    rgba(255, 255, 255, 0.65) 50%,
+    rgba(37, 99, 235, 0.08) 100%
+  );
+  background-size: 200% 100%;
+  background-color: #F3F4F6;
+  animation: shimmer 1400ms linear infinite;
+}
+
+@keyframes indeterminate-bar {
+  0%   { transform: scaleX(0); transform-origin: left; }
+  50%  { transform: scaleX(1); transform-origin: left; }
+  100% { transform: scaleX(0); transform-origin: right; }
+}
+
+.indeterminate-bar {
+  animation: indeterminate-bar 2000ms ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-region {
+    animation: none;
+    background: #F3F4F6;
+  }
+  .indeterminate-bar {
+    animation: none;
+    transform: scaleX(0.5);
+  }
+}

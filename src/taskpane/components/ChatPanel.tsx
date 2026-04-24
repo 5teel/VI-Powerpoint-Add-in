@@ -8,10 +8,18 @@ import {
   MessageBarActions,
   Text,
 } from "@fluentui/react-components";
-import { streamCubeAI, StreamPhase, CubeAIStreamResult, CubeAIError } from "../services/cubeai";
+import {
+  streamCubeAI,
+  StreamPhase,
+  CubeAIStreamResult,
+  CubeAIError,
+  type CubeSqlApiToolCall,
+} from "../services/cubeai";
 import { buildSlidePrompt } from "../services/promptBuilder";
 import { extractSlideContent, fallbackToTextOnly, summarizeSlideContent } from "../services/schemaParser";
 import { insertSlide } from "../services/slideRenderer";
+import { routeCreateSlide } from "../services/slideRouter";
+import { SlidePreview, type SlidePreviewStage } from "./SlidePreview";
 
 const SUMMIT_NAVY = "#0F1330";
 
@@ -20,7 +28,18 @@ interface ChatMessage {
   content: string;
   rawContent?: string; // Original response for slide creation (may contain JSON)
   error?: CubeAIError;
-  slideState?: "idle" | "creating" | "created" | "failed";
+  slideState?:
+    | "idle"
+    | "creating"
+    | "fetching-data"
+    | "composing"
+    | "rendering"
+    | "created"
+    | "failed";
+  /** Finalised cubeSqlApi toolCall captured during the stream (D-02 router input). */
+  toolCall?: CubeSqlApiToolCall;
+  /** CMPS-03 grounding anchor — Cube AI assistant text captured alongside the toolCall (D-05). */
+  commentary?: string;
 }
 
 const PHASE_LABELS: Record<StreamPhase, string> = {
@@ -62,21 +81,43 @@ const ChatPanel: React.FC = () => {
       setStreamingContent("");
 
       const wrappedQuestion = buildSlidePrompt(question);
+
+      // Phase 5 D-02 + CMPS-03 capture — populated during the stream.
+      let capturedToolCall: CubeSqlApiToolCall | null = null;
+      let capturedCommentary = "";
+
       const controller = streamCubeAI(wrappedQuestion, chatId, {
         onPhaseChange: (p: StreamPhase) => setPhase(p),
-        onContent: (content: string) => setStreamingContent(content),
+        onContent: (content: string) => {
+          setStreamingContent(content);
+          // CMPS-03: track the final assistant text. The stream fires onContent
+          // throttled (~200ms) and once un-throttled at end-of-stream, so the
+          // last value observed is the complete assistant commentary.
+          capturedCommentary = content;
+        },
+        onToolCall: (tc: CubeSqlApiToolCall) => {
+          capturedToolCall = tc;
+        },
         onComplete: (result: CubeAIStreamResult) => {
           const raw = result.content || "";
           const parsed = extractSlideContent(raw);
           const displayText = parsed
             ? summarizeSlideContent(parsed)
             : raw || "(No response received)";
-          setMessages((prev) => [...prev, {
-            role: "assistant",
-            content: displayText,
-            rawContent: raw,
-            slideState: "idle",
-          }]);
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: displayText,
+              rawContent: raw,
+              slideState: "idle",
+              toolCall: capturedToolCall ?? undefined,
+              // CMPS-03 grounding anchor: non-empty when Cube AI streamed both
+              // a toolCall and assistant content in the same stream. Threaded
+              // to composer.cubeMeta.commentary via SlidePreview.
+              commentary: capturedCommentary || raw || undefined,
+            },
+          ]);
           setStreamingContent("");
           setPhase(null);
           if (result.chatId) setChatId(result.chatId);
@@ -101,6 +142,17 @@ const ChatPanel: React.FC = () => {
     const msg = messages[messageIndex];
     if (!msg || msg.role !== "assistant" || msg.slideState !== "idle") return;
 
+    // Phase 5 D-02: if Cube AI emitted a finalised cubeSqlApi toolCall, hand off
+    // to SlidePreview (composition pipeline). SlidePreview owns the lifecycle;
+    // this handler just flips slideState so the render branch mounts the preview.
+    if (routeCreateSlide(msg) === "composition") {
+      setMessages((prev) =>
+        prev.map((m, i) => (i === messageIndex ? { ...m, slideState: "fetching-data" as const } : m))
+      );
+      return;
+    }
+
+    // Legacy narrative path — unchanged.
     setMessages(prev => prev.map((m, i) =>
       i === messageIndex ? { ...m, slideState: "creating" as const } : m
     ));
@@ -119,6 +171,18 @@ const ChatPanel: React.FC = () => {
       ));
     }
   }, [messages]);
+
+  /** Map SlidePreviewStage → ChatMessage.slideState (success → created, failed → failed). */
+  const mapStageToSlideState = (s: SlidePreviewStage): ChatMessage["slideState"] =>
+    s === "success" ? "created" : s === "failed" ? "failed" : s;
+
+  /** Walk backwards from `fromIdx` to find the last user message — question context for SlidePreview. */
+  const findLastUserQuestion = (fromIdx: number): string => {
+    for (let i = fromIdx - 1; i >= 0; i--) {
+      if (messages[i].role === "user") return messages[i].content;
+    }
+    return "";
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -231,6 +295,37 @@ const ChatPanel: React.FC = () => {
                     Create Slide
                   </Button>
                 )}
+                {(msg.slideState === "fetching-data" ||
+                  msg.slideState === "composing" ||
+                  msg.slideState === "rendering") &&
+                  msg.toolCall && (
+                    <SlidePreview
+                      toolCall={msg.toolCall}
+                      userQuestion={findLastUserQuestion(i) || msg.content}
+                      commentary={msg.commentary ?? ""}
+                      onStageChange={(s) =>
+                        setMessages((prev) =>
+                          prev.map((m, idx) =>
+                            idx === i ? { ...m, slideState: mapStageToSlideState(s) } : m
+                          )
+                        )
+                      }
+                      onSuccess={() =>
+                        setMessages((prev) =>
+                          prev.map((m, idx) =>
+                            idx === i ? { ...m, slideState: "created" as const } : m
+                          )
+                        )
+                      }
+                      onError={() =>
+                        setMessages((prev) =>
+                          prev.map((m, idx) =>
+                            idx === i ? { ...m, slideState: "failed" as const } : m
+                          )
+                        )
+                      }
+                    />
+                  )}
                 {msg.slideState === "creating" && (
                   <Button
                     appearance="primary"

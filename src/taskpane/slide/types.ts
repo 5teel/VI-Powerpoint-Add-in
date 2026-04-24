@@ -120,5 +120,18 @@ export interface WizardData {
 /** Wizard step number (1=Brand, 2=Image, 3=Purpose, 4=Review). */
 export type WizardStep = 1 | 2 | 3 | 4;
 
-/** Build lifecycle state for the guided slide builder. */
-export type BuildState = "idle" | "building" | "built" | "failed";
+/** Build lifecycle state for the guided slide builder.
+ *
+ * Phase 5 widens this union to include the SlidePreview composition stages
+ * (`fetching-data | composing | rendering`) so WizardPanel can drive a live
+ * preview when Cube AI emits a cubeSqlApi toolCall. Legacy narrative builds
+ * still use `building` only and transition to `built` / `failed`.
+ */
+export type BuildState =
+  | "idle"
+  | "building"
+  | "fetching-data"
+  | "composing"
+  | "rendering"
+  | "built"
+  | "failed";
