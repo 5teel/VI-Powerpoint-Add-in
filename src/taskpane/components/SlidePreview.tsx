@@ -138,8 +138,12 @@ export const SlidePreview: React.FC<SlidePreviewProps> = ({
             onFinal: (plan) => {
               finalPlan = plan;
             },
-            onError: (err) => {
-              throw err;
+            // Do not re-throw here — composeWithRetry already rejects the outer
+            // promise on error (see the settled-guard in attempt()). Re-throwing
+            // from inside composer's try/catch would cause recursive cb.onError
+            // dispatch and defeat the reject handoff.
+            onError: () => {
+              /* swallow — outer await will reject via composeWithRetry */
             },
           },
           toolCall.input.vegaSpec as object | undefined

@@ -27,10 +27,22 @@ export async function composeWithRetry(
             userQuestion: `${input.userQuestion}\n\nREPAIR INSTRUCTIONS (previous attempt failed):\n${repairHint}`,
           }
         : input;
+      // Guard against double-settle: composeSlide may call onFinal AND onError
+      // (e.g., stream "error" event + try/catch), or either twice on edge paths.
+      // Only the first call wins — subsequent calls are ignored.
+      let settled = false;
       composeSlide(augmented, {
         onPartialPlan: cb.onPartialPlan,
-        onFinal: resolve,
-        onError: reject,
+        onFinal: (p) => {
+          if (settled) return;
+          settled = true;
+          resolve(p);
+        },
+        onError: (e) => {
+          if (settled) return;
+          settled = true;
+          reject(e);
+        },
       });
     });
 
