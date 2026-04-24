@@ -17,11 +17,35 @@ export interface CubeAIError {
   retryable: boolean;
 }
 
+/** cubeSqlApi toolCall surfaced from Cube AI's NDJSON stream (Phase 5, D-02 router). */
+export interface CubeSqlApiToolCall {
+  name: "cubeSqlApi";
+  isInProcess: false;
+  input: {
+    sqlQuery: string;
+    queryTitle: string;
+    description: string;
+    chartCategory: "vega" | "table";
+    vegaSpec?: object;
+    tableChartSpec?: {
+      showRowNumbers?: boolean;
+      showColumnTotals?: boolean;
+      showRowTotals?: boolean;
+      showPagination?: boolean;
+      columns?: string[];
+      pivot?: boolean;
+    };
+    memoryId?: string;
+    userRequest?: string;
+  };
+}
+
 export interface StreamCallbacks {
   onPhaseChange: (phase: StreamPhase) => void;
   onContent: (accumulatedContent: string) => void;
   onComplete: (result: CubeAIStreamResult) => void;
   onError: (error: CubeAIError) => void;
+  onToolCall?: (toolCall: CubeSqlApiToolCall) => void; // NEW — Phase 5 D-02 router hook
 }
 
 /**
@@ -168,6 +192,15 @@ export function streamCubeAI(
                 retryable: true,
               });
               return;
+            }
+
+            // Phase 5 D-02: surface finalised cubeSqlApi toolCalls to the router hook.
+            if (
+              message.role === "tool" &&
+              message.toolCall?.name === "cubeSqlApi" &&
+              message.toolCall?.isInProcess === false
+            ) {
+              callbacks.onToolCall?.(message.toolCall as CubeSqlApiToolCall);
             }
 
             // Capture chat ID from state message
