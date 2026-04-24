@@ -49,6 +49,11 @@ export const CompositionPlanSchema = z
     tableSpec: TableSpecSchema.optional(),
     dataFilter: DataFilterSchema.optional(),
   })
+  // Reject unknown top-level keys so unexpected AI output (e.g., a hallucinated
+  // "dangerouslyAllowScripts" top-level field) surfaces at Zod.parse rather than
+  // silently passing through to downstream consumers. chartSpec itself remains
+  // a z.record(z.any()) since Vega-Lite accepts many legitimate keys.
+  .strict()
   .refine(
     (p) =>
       p.chartSpec !== undefined ||
