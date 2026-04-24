@@ -7,9 +7,11 @@ import ImageStep from "./wizard/ImageStep";
 import PurposeStep from "./wizard/PurposeStep";
 import ReviewStep from "./wizard/ReviewStep";
 import { buildGuidedPrompt } from "../services/promptBuilder";
-import { streamCubeAI } from "../services/cubeai";
+import { streamCubeAI, type CubeSqlApiToolCall } from "../services/cubeai";
 import { extractSlideContent, fallbackToTextOnly } from "../services/schemaParser";
 import { insertSlide } from "../services/slideRenderer";
+import { routeCreateSlide } from "../services/slideRouter";
+import type { SlidePreviewStage } from "./SlidePreview";
 
 const SUMMIT_NAVY = "#0F1330";
 
@@ -24,6 +26,10 @@ const WizardPanel: React.FC = () => {
   const [data, setData] = useState<WizardData>(DEFAULT_DATA);
   const [buildState, setBuildState] = useState<BuildState>("idle");
   const controllerRef = useRef<AbortController | null>(null);
+  // Phase 5 D-02 + CMPS-03 capture — refs so streamCubeAI callbacks can mutate
+  // without triggering re-renders mid-stream.
+  const toolCallRef = useRef<CubeSqlApiToolCall | null>(null);
+  const commentaryRef = useRef<string>("");
 
   // Abort in-flight request on unmount
   useEffect(() => {
@@ -63,14 +69,32 @@ const WizardPanel: React.FC = () => {
 
   const handleBuild = useCallback(() => {
     setBuildState("building");
+    // Reset Phase 5 D-02 + CMPS-03 capture refs at the start of every build.
+    toolCallRef.current = null;
+    commentaryRef.current = "";
 
     const prompt = buildGuidedPrompt(data.brandName, data.purpose);
     const controller = streamCubeAI(prompt, null, {
       onPhaseChange: () => {},
-      onContent: () => {},
+      onContent: (content: string) => {
+        // CMPS-03 grounding: capture the final assistant text alongside any toolCall.
+        commentaryRef.current = content;
+      },
+      onToolCall: (tc: CubeSqlApiToolCall) => {
+        toolCallRef.current = tc;
+      },
       onComplete: async (result) => {
         try {
           const raw = result.content || "";
+          // Phase 5 D-02: if Cube AI emitted a finalised cubeSqlApi toolCall,
+          // hand off to SlidePreview (ReviewStep mounts it). CMPS-03 ensures
+          // the commentary ref is populated before SlidePreview reads it.
+          if (routeCreateSlide({ toolCall: toolCallRef.current }) === "composition") {
+            if (!commentaryRef.current) commentaryRef.current = raw;
+            setBuildState("fetching-data");
+            return;
+          }
+          // Legacy narrative fallback — unchanged.
           const content = extractSlideContent(raw) ?? fallbackToTextOnly(raw);
           await insertSlide(content, data.productImageBase64 ?? undefined);
           setBuildState("built");
@@ -85,6 +109,10 @@ const WizardPanel: React.FC = () => {
 
     controllerRef.current = controller;
   }, [data]);
+
+  /** Map SlidePreviewStage → BuildState (success → built, failed → failed, rest passes through). */
+  const mapStageToBuildState = (s: SlidePreviewStage): BuildState =>
+    s === "success" ? "built" : s === "failed" ? "failed" : s;
 
   const handleReset = useCallback(() => {
     setStep(1);
@@ -107,6 +135,10 @@ const WizardPanel: React.FC = () => {
             buildState={buildState}
             onBuild={handleBuild}
             onReset={handleReset}
+            toolCall={toolCallRef.current}
+            commentary={commentaryRef.current}
+            onBuildStateChange={(next) => setBuildState(next)}
+            mapStageToBuildState={mapStageToBuildState}
           />
         );
       default:

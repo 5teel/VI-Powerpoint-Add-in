@@ -1,6 +1,8 @@
 import React from "react";
 import { Button, Spinner, Text } from "@fluentui/react-components";
 import type { WizardData, BuildState } from "../../slide/types";
+import type { CubeSqlApiToolCall } from "../../services/cubeai";
+import { SlidePreview, type SlidePreviewStage } from "../SlidePreview";
 
 const SUMMIT_NAVY = "#0F1330";
 
@@ -9,9 +11,32 @@ interface ReviewStepProps {
   buildState: BuildState;
   onBuild: () => void;
   onReset: () => void;
+  /** Phase 5 D-02: when present, SlidePreview drives the composition pipeline. */
+  toolCall?: CubeSqlApiToolCall | null;
+  /** CMPS-03 grounding anchor — Cube AI assistant text threaded into composer.cubeMeta.commentary. */
+  commentary?: string;
+  /** Parent setter used by SlidePreview to report stage / success / failure. */
+  onBuildStateChange?: (next: BuildState) => void;
+  /** Mapping helper — parent owns so the translation stays in one place. */
+  mapStageToBuildState?: (stage: SlidePreviewStage) => BuildState;
 }
 
-const ReviewStep: React.FC<ReviewStepProps> = ({ data, buildState, onBuild, onReset }) => {
+const ReviewStep: React.FC<ReviewStepProps> = ({
+  data,
+  buildState,
+  onBuild,
+  onReset,
+  toolCall,
+  commentary,
+  onBuildStateChange,
+  mapStageToBuildState,
+}) => {
+  const showSlidePreview =
+    (buildState === "fetching-data" ||
+      buildState === "composing" ||
+      buildState === "rendering") &&
+    !!toolCall;
+
   return (
     <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "16px" }}>
       <Text weight="semibold" size={400}>
@@ -77,6 +102,22 @@ const ReviewStep: React.FC<ReviewStepProps> = ({ data, buildState, onBuild, onRe
         <Button appearance="primary" disabled>
           <Spinner size="tiny" /> Building...
         </Button>
+      )}
+
+      {/* Phase 5 D-02: live composition preview when Cube AI emitted a toolCall. */}
+      {showSlidePreview && toolCall && (
+        <SlidePreview
+          toolCall={toolCall}
+          userQuestion={`${data.purpose} for ${data.brandName}`}
+          commentary={commentary ?? ""}
+          onStageChange={(s) => {
+            if (onBuildStateChange && mapStageToBuildState) {
+              onBuildStateChange(mapStageToBuildState(s));
+            }
+          }}
+          onSuccess={() => onBuildStateChange?.("built")}
+          onError={() => onBuildStateChange?.("failed")}
+        />
       )}
 
       {buildState === "built" && (
