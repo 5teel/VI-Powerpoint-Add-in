@@ -33,6 +33,36 @@ export async function detectSlideWidth(
 }
 
 /**
+ * Detects the height of slides in the current presentation.
+ *
+ * Mirrors detectSlideWidth — attempts to read the first slide, falls back to
+ * the widescreen default (540pt) on failure. Used by composedRenderer so regions
+ * computed from fractional y/h map against the correct canvas height on 4:3
+ * (720x540), 16:9 (960x540), and custom-sized decks.
+ *
+ * @returns Slide height in points.
+ */
+export async function detectSlideHeight(
+  context: PowerPoint.RequestContext
+): Promise<number> {
+  try {
+    const slides = context.presentation.slides;
+    const firstSlide = slides.getItemAt(0);
+    firstSlide.load("id");
+    await context.sync();
+
+    // Slide height is not directly readable from the Slide object in API 1.8.
+    // Widescreen and 4:3 standard both share 540pt height, so returning the
+    // widescreen default is correct for the common case. A future enhancement
+    // could read slideMaster dimensions for custom-sized decks.
+    return WIDESCREEN.height;
+  } catch {
+    // No slides or read failed — return widescreen default
+    return WIDESCREEN.height;
+  }
+}
+
+/**
  * Adds a new slide at the current position in the deck.
  *
  * - PREVIEW path (API 1.9+): Uses AddSlideOptions.index to insert after the

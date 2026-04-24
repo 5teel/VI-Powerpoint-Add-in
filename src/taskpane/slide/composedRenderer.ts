@@ -14,11 +14,10 @@
  * for pre-flight checks by upstream callers; the renderer itself trusts
  * regions to be valid.
  */
-import { detectSlideWidth, addSlideAtCurrentPosition } from "./layoutEngine";
+import { detectSlideWidth, detectSlideHeight, addSlideAtCurrentPosition } from "./layoutEngine";
 import { addTitle, addBody, addSummaryText, addCalloutBox } from "./textRenderer";
 import { addTable, type TableRenderOptions } from "./tableRenderer";
 import type { LayoutRegion } from "./types";
-import { WIDESCREEN } from "./constants";
 import type { ComposedSlideContent } from "./types";
 
 export interface Region {
@@ -88,7 +87,7 @@ function rectsOverlap(a: Region, b: Region): boolean {
 export async function renderComposedSlide(content: ComposedSlideContent): Promise<void> {
   await PowerPoint.run(async (context) => {
     const slideWidth = await detectSlideWidth(context);
-    const slideHeight = WIDESCREEN.height;
+    const slideHeight = await detectSlideHeight(context);
 
     const slide = await addSlideAtCurrentPosition(context);
     const shapes = slide.shapes;
