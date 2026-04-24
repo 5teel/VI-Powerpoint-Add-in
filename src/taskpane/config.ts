@@ -11,7 +11,7 @@ declare const __CUBEAI_TIMEOUT_MS__: number;
 export const CUBEAI_CONFIG = {
   baseUrl: __CUBEAI_BASE_URL__,
   apiKey: __CUBEAI_API_KEY__,
-  internalId: __CUBEAI_EXTERNAL_ID__,
+  externalId: __CUBEAI_EXTERNAL_ID__,
   timeoutMs: __CUBEAI_TIMEOUT_MS__,
 };
 

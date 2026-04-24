@@ -77,9 +77,7 @@ export function streamCubeAI(
           body: JSON.stringify({
             input: question,
             sessionSettings: {
-              ...(CUBEAI_CONFIG.internalId
-                ? { internalId: CUBEAI_CONFIG.internalId }
-                : { externalId: CUBEAI_CONFIG.externalId }),
+              externalId: CUBEAI_CONFIG.externalId,
               ...(chatId ? { chatId } : {}),
             },
           }),
