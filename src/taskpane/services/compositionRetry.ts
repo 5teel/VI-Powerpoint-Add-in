@@ -1,6 +1,12 @@
 /**
  * G1 (Zod) + G2 (Vega-Lite) guardrails with 1-retry-with-repair-hint discipline.
  * See 05-AI-SPEC.md §6 Guardrails table.
+ *
+ * Phase 6 D-13: the FIRST attempt is wrapped with retryWithBackoff keyed on
+ * isAnthropicRateLimit, so transient Anthropic 429s auto-retry 1s/2s/4s up to
+ * 3 attempts before surfacing. G1/G2 repair-hint retries are orthogonal —
+ * they handle correctness-of-output failures, not rate-limit failures — and
+ * are NOT wrapped (we don't want to compound retries).
  */
 import Ajv from "ajv";
 import addFormats from "ajv-formats";
@@ -8,6 +14,7 @@ import vegaLiteSchema from "vega-lite/vega-lite-schema.json";
 import { composeSlide, type ComposerInput, type ComposerCallbacks } from "./composer";
 import type { CompositionPlan } from "./compositionSchema";
 import { logEvent } from "./telemetry";
+import { retryWithBackoff, isAnthropicRateLimit } from "./retryBackoff";
 
 // Compile validator once at module load — O(ms) cost paid once per bundle lifetime.
 const ajv = new Ajv({ strict: false, allErrors: true });
@@ -47,7 +54,39 @@ export async function composeWithRetry(
     });
 
   try {
-    let plan = await attempt();
+    // Phase 6 D-13: wrap the first attempt with retryWithBackoff to auto-retry
+    // Anthropic 429s. G1 (Zod) and G2 (Vega-Lite) retries below are orthogonal —
+    // they handle correctness-of-output failures, not rate-limit failures. Do NOT
+    // compound (no 429 wrapper around the repair-hint retry below).
+    let plan = await retryWithBackoff(
+      (_attemptNum) => attempt(),
+      {
+        maxAttempts: 3,
+        baseMs: 1000,
+        capMs: 30000,
+        jitter: 0.2,
+        isRetryable: isAnthropicRateLimit,
+        onBackoff: (attemptN, waitMs) => {
+          logEvent("stage_retry_invoked", {
+            stage: "composing",
+            attempt: attemptN,
+            reason: "rate-limit",
+            waitMs,
+          });
+          cb.onRateLimitRetry?.(attemptN, waitMs);
+        },
+        signal: input.signal,
+      }
+    ).catch((err) => {
+      if (isAnthropicRateLimit(err)) {
+        logEvent("stage_retry_invoked", {
+          stage: "composing",
+          attempt: 3,
+          reason: "rate-limit-exhausted",
+        });
+      }
+      throw err;
+    });
 
     if (plan.chartSpec && !validateVegaLite(plan.chartSpec)) {
       const errs = (validateVegaLite.errors ?? [])

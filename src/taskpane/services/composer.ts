@@ -42,6 +42,8 @@ export interface ComposerCallbacks {
   onPartialPlan: (partial: Partial<CompositionPlan>) => void;
   onFinal: (plan: CompositionPlan) => void;
   onError: (err: Error) => void;
+  /** Phase 6 D-13: fires between 429 retry attempts. delayMs = wait before next attempt. */
+  onRateLimitRetry?: (attempt: number, delayMs: number) => void;
 }
 
 // Singleton client at module load — surfaces construction errors (Pitfall 5) fail-fast.
