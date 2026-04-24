@@ -14,6 +14,10 @@
  * browser boundary we type-cast to HTMLCanvasElement.
  */
 
+// vega-lite v6 ships types via "exports"."." → ./build/index.d.ts. tsconfig's
+// moduleResolution:"node" can't resolve the "exports" map, but a local ambient
+// declaration at src/types/vega-lite.d.ts shims the package so tsc accepts the
+// import. Runtime resolution (webpack, vitest) follows the exports field.
 import * as vegaLite from "vega-lite";
 import * as vega from "vega";
 

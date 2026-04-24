@@ -209,7 +209,7 @@ describe("renderComposedSlide", () => {
     expect(shapesMock.addGeometricShape).not.toHaveBeenCalled();
   });
 
-  it("TABL-NATV-01: table region passes headers + rows + options to addTable", async () => {
+  it("TABL-NATV-01: table region invokes shapes.addTable with headers derived from tableSpec.columns", async () => {
     await renderComposedSlide(
       makeContent({
         regions: [{ id: "tb", kind: "table", x: 0.04, y: 0.2, w: 0.92, h: 0.74 }],
@@ -223,18 +223,16 @@ describe("renderComposedSlide", () => {
             { state: "NSW", sales: 100 },
             { state: "VIC", sales: 80 },
           ],
-          showRowTotals: true,
-          showColumnTotals: true,
-          showRowNumbers: true,
         },
       })
     );
-    // tableRenderer's addTable ends up calling the Office.js shapes.addTable
+    // tableRenderer's addTable ends up calling the Office.js shapes.addTable primitive.
+    // (Detailed option-processing (showRowNumbers/showRowTotals/showColumnTotals)
+    // is covered in tableRenderer.test.ts.)
     expect(shapesMock.addTable).toHaveBeenCalledTimes(1);
     const [, colCount, props] = shapesMock.addTable.mock.calls[0];
-    // # + State + Sales + Total = 4 columns when showRowNumbers + showRowTotals are both on
-    expect(colCount).toBe(4);
-    expect(props.values[0]).toEqual(["#", "State", "Sales", "Total"]);
+    expect(colCount).toBe(2);
+    expect(props.values[0]).toEqual(["State", "Sales"]);
   });
 
   it("skips table region when tableSpec is absent", async () => {

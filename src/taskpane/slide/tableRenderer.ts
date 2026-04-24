@@ -10,6 +10,26 @@ import { LayoutRegion } from "./types";
 import { COLORS, FONT } from "./constants";
 import { formatCellValue } from "./numberFormatter";
 
+/**
+ * Options for addTable (TABL-NATV-01).
+ * Absent options preserve existing behaviour verbatim (backward-compatible).
+ *
+ * Ordering semantics (applied in Task 3 logic):
+ *   1. Row totals (appends "Total" column with per-row sums)
+ *   2. Row numbers (prepends "#" column)
+ *   3. Column totals (appends footer row with per-column sums)
+ * So bottom-right cell is the grand total when both row + column totals enabled.
+ */
+export interface TableRenderOptions {
+  showRowNumbers?: boolean;
+  showColumnTotals?: boolean;
+  showRowTotals?: boolean;
+  /** Intentionally unused — TableV2 has no native pagination. Logs once via console.info. */
+  showPagination?: boolean;
+  /** Overrides default 10-row cap. */
+  maxRows?: number;
+}
+
 /** Standard border definition for all table cells. */
 const CELL_BORDER = {
   color: COLORS.TABLE_BORDER,
@@ -38,8 +58,12 @@ export function addTable(
   shapes: PowerPoint.ShapeCollection,
   headers: string[],
   rows: (string | number)[][],
-  region: LayoutRegion
+  region: LayoutRegion,
+  _options: TableRenderOptions = {}
 ): PowerPoint.Shape {
+  // Placeholder hook — full option processing lands in Task 3. Silences unused-var
+  // warning while keeping the 5th-arg contract stable for composedRenderer.
+  void _options;
   const colCount = headers.length;
 
   // Normalize rows: pad short rows with empty strings, trim long rows to match header count

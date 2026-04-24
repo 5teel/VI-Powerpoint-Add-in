@@ -20,6 +20,7 @@ import { addTitle, addBody, addCalloutBox, addSummaryText } from "../slide/textR
 import { addTable } from "../slide/tableRenderer";
 import { addChartPlaceholder } from "../slide/placeholderRenderer";
 import { detectSlideWidth, addSlideAtCurrentPosition } from "../slide/layoutEngine";
+import { renderComposedSlide } from "../slide/composedRenderer";
 
 /**
  * Inserts a new slide with the given content, using the appropriate layout template.
@@ -34,6 +35,12 @@ import { detectSlideWidth, addSlideAtCurrentPosition } from "../slide/layoutEngi
  * Layout regions are adapted for the detected slide width (D-01).
  */
 export async function insertSlide(content: SlideContent, productImageBase64?: string): Promise<void> {
+  // Phase 5: composed slides own their regions + PowerPoint.run lifecycle.
+  // Early-return to avoid nested PowerPoint.run (Office.js does not support nesting).
+  if (content.type === "composed") {
+    return renderComposedSlide(content);
+  }
+
   await PowerPoint.run(async (context) => {
     // Detect slide dimensions for adaptive layout (D-01)
     const slideWidth = await detectSlideWidth(context);
