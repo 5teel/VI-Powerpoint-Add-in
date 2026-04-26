@@ -30,6 +30,8 @@ import { logEvent } from "../services/telemetry";
 import { SlidePreview, type SlidePreviewStage } from "./SlidePreview";
 import { RefiningChip } from "./RefiningChip";
 import { SuggestedQuestionsTray } from "./SuggestedQuestionsTray";
+import { SectionStrip } from "./SectionStrip";
+import { planSection, type MetaComposerInput, type SectionPlan } from "../services/metaComposer";
 
 const SUMMIT_NAVY = "#0F1330";
 
@@ -164,6 +166,19 @@ const ChatPanel: React.FC = () => {
     messageIndex: number;
     onReplace: () => void;
     onInsertNew: () => void;
+  } | null>(null);
+
+  // ── Phase 6 Wave 7 D-05/D-07 section-plan build state ──────────────────
+  // When set, the assistant message at `messageIndex` mounts <SectionStrip />
+  // instead of the Phase 5 SlidePreview path. Cleared on onAllDone / onPlanError.
+  const [sectionBuild, setSectionBuild] = useState<{
+    messageIndex: number;
+    input: {
+      userQuestion: string;
+      toolCall: CubeSqlApiToolCall;
+      cubeRows: unknown[];
+      commentary: string;
+    };
   } | null>(null);
 
   // Abort in-flight request on unmount (Pitfall 2)
@@ -488,22 +503,13 @@ const ChatPanel: React.FC = () => {
           setPhase(null);
           if (result.chatId) setChatId(result.chatId);
 
-          // Phase 6 routing — decide branch.
-          const ctxRoute = {
-            refinementChipVisible: isRefinementFlow,
-            lastSlideTitle: submitLastSlideTitle ?? undefined,
-            // Section-plan routing is delegated to 06-07 (planSection preflight).
-            // For Plan 06-06, "force-single" pins routeMessage to single-slide paths;
-            // 06-07 will replace this with planSection's allow-multi/force-single decision.
-            sectionPlanHint: "force-single" as const,
-          };
-          const route: MessageRoute = routeMessage(
-            { toolCall: capturedToolCall },
-            ctxRoute
-          );
-
+          // ─────────────────────────────────────────────────────────────────
+          // (A) Refinement short-circuit — PRESERVED from Plan 06-06.
+          // Refinement NEVER goes multi-slide by contract — short-circuits
+          // before planSection so the meta-composer never plans for a refinement.
+          // ─────────────────────────────────────────────────────────────────
           if (
-            route === "refinement" &&
+            isRefinementFlow &&
             capturedToolCall &&
             lastBuildRef.current
           ) {
@@ -533,9 +539,120 @@ const ChatPanel: React.FC = () => {
             return;
           }
 
-          // route === "new-composition" or "narrative":
-          // Preserve Phase 5 behavior — message sits with slideState: "idle"
-          // and the user clicks "Create Slide". Section-plan branch lives in 06-07.
+          // ─────────────────────────────────────────────────────────────────
+          // (B) planSection preflight — D-05 LITERAL (Wave 7).
+          // For EVERY composition-route message that is NOT a refinement, invoke
+          // planSection via the callback adapter (mirrors sectionOrchestrator.ts
+          // lines 138–169). No keyword/regex gate. On failure, default to a
+          // single-slide plan and fall through to the Phase 5 path.
+          // ─────────────────────────────────────────────────────────────────
+          let sectionPlan: SectionPlan | null = null;
+          let plannedSlideCount = 1;
+
+          if (capturedToolCall && capturedToolCall.isInProcess === false) {
+            const tc = capturedToolCall as CubeSqlApiToolCall;
+            const input: MetaComposerInput = {
+              userQuestion: question,
+              cubeMeta: {
+                queryTitle: tc.input.queryTitle ?? "",
+                description: tc.input.description ?? "",
+                commentary: capturedCommentary || raw,
+                chartCategory: tc.input.chartCategory,
+              },
+              signal: controller.signal,
+            };
+            try {
+              sectionPlan = await new Promise<SectionPlan>((resolve, reject) => {
+                let settled = false;
+                planSection(input, {
+                  onPartialPlan: () => {
+                    /* wave-7 ChatPanel scope: final-only */
+                  },
+                  onFinal: (p) => {
+                    if (!settled) {
+                      settled = true;
+                      resolve(p);
+                    }
+                  },
+                  onError: (e) => {
+                    if (!settled) {
+                      settled = true;
+                      reject(e);
+                    }
+                  },
+                });
+              });
+              plannedSlideCount = sectionPlan.slides.length;
+              logEvent("planSection.completed", {
+                plannedSlideCount,
+                sectionTitle: sectionPlan.sectionTitle,
+              });
+            } catch (err) {
+              // Meta-composer failure → graceful degrade to single-slide.
+              logEvent("planSection.failed_defaulting_single", {
+                err: String(err),
+              });
+              sectionPlan = null;
+              plannedSlideCount = 1;
+            }
+          }
+
+          // ─────────────────────────────────────────────────────────────────
+          // (C) Route decision. routeMessage uses sectionPlanHint (force-single
+          // vs allow-multi) derived from plannedSlideCount. If it returns
+          // "section-plan", we mount SectionStrip; otherwise we fall through.
+          // ─────────────────────────────────────────────────────────────────
+          const ctxRoute = {
+            refinementChipVisible: false, // refinement short-circuit returned above
+            lastSlideTitle: submitLastSlideTitle ?? undefined,
+            sectionPlanHint: (plannedSlideCount > 1
+              ? "allow-multi"
+              : "force-single") as "force-single" | "allow-multi",
+          };
+          const route: MessageRoute = routeMessage(
+            { toolCall: capturedToolCall },
+            ctxRoute
+          );
+
+          if (
+            route === "section-plan" &&
+            capturedToolCall &&
+            sectionPlan
+          ) {
+            // Multi-slide path: fetch Cube data once, mount SectionStrip.
+            const tc = capturedToolCall as CubeSqlApiToolCall;
+            try {
+              const cubeQuery = translateSql(tc.input.sqlQuery);
+              const cubeResp = await loadCubeData(cubeQuery, {
+                signal: controller.signal,
+              });
+              setSectionBuild({
+                messageIndex: newMsgIdx,
+                input: {
+                  userQuestion: question,
+                  toolCall: tc,
+                  cubeRows: cubeResp.data,
+                  commentary: capturedCommentary || raw,
+                },
+              });
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+              setMessages((prev) => [
+                ...prev,
+                {
+                  role: "error",
+                  content: `Couldn't fetch section data: ${msg}`,
+                },
+              ]);
+            }
+            return;
+          }
+
+          // ─────────────────────────────────────────────────────────────────
+          // (D) new-composition + narrative: existing Plan 06-06 / Phase 5
+          // behavior — message sits idle until the user clicks Create Slide,
+          // OR narrative renders plain assistant text.
+          // ─────────────────────────────────────────────────────────────────
         },
         onError: (error: CubeAIError) => {
           setMessages((prev) => [...prev, { role: "error", content: error.message, error }]);
@@ -713,7 +830,7 @@ const ChatPanel: React.FC = () => {
                 >
                   <Text size={300}>{msg.content}</Text>
                 </div>
-                {msg.slideState === "idle" && (
+                {msg.slideState === "idle" && sectionBuild?.messageIndex !== i && (
                   <Button
                     appearance="primary"
                     size="small"
@@ -722,6 +839,48 @@ const ChatPanel: React.FC = () => {
                   >
                     Create Slide
                   </Button>
+                )}
+
+                {/* Phase 6 Wave 7 D-07 — multi-slide section strip mount. When a
+                    section plan returned slides.length > 1, this branch renders
+                    in place of the Phase 5 SlidePreview / Create Slide button. */}
+                {msg.role === "assistant" && sectionBuild?.messageIndex === i && (
+                  <SectionStrip
+                    input={sectionBuild.input}
+                    onAllDone={() => {
+                      setSectionBuild(null);
+                      setMessages((prev) =>
+                        prev.map((m, mi) =>
+                          mi === i
+                            ? { ...m, slideState: "created" as const }
+                            : m
+                        )
+                      );
+                      // Note: SectionStrip handles each inserted slide's
+                      // lifecycle via the orchestrator. The orchestrator does
+                      // NOT expose a per-slide post-insert hook, so Replace-
+                      // after-section-build is acceptable per D-04 (which
+                      // governs single-slide replace only).
+                    }}
+                    onPlanError={(err) => {
+                      setSectionBuild(null);
+                      setMessages((prev) =>
+                        prev.map((m, mi) =>
+                          mi === i
+                            ? {
+                                ...m,
+                                slideState: "failed" as const,
+                                error: {
+                                  message: err.message,
+                                  type: "unknown",
+                                  retryable: false,
+                                },
+                              }
+                            : m
+                        )
+                      );
+                    }}
+                  />
                 )}
 
                 {/* Phase 6 refinement render branch — SlidePreview skipAutoStart so
@@ -747,8 +906,10 @@ const ChatPanel: React.FC = () => {
                   />
                 )}
 
-                {/* Phase 5 self-driving SlidePreview — UNCHANGED for new-composition path. */}
+                {/* Phase 5 self-driving SlidePreview — UNCHANGED for new-composition path.
+                    Suppressed when this message is being driven by SectionStrip (Wave 7). */}
                 {!msg.isRefinement &&
+                  sectionBuild?.messageIndex !== i &&
                   (msg.slideState === "fetching-data" ||
                     msg.slideState === "composing" ||
                     msg.slideState === "rendering") &&
