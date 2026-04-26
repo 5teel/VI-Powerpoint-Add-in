@@ -17,9 +17,19 @@ import {
 } from "../services/cubeai";
 import { buildSlidePrompt } from "../services/promptBuilder";
 import { extractSlideContent, fallbackToTextOnly, summarizeSlideContent } from "../services/schemaParser";
-import { insertSlide } from "../services/slideRenderer";
-import { routeCreateSlide } from "../services/slideRouter";
+import { insertSlide, type ComposedSlideContent } from "../services/slideRenderer";
+import { routeCreateSlide, routeMessage, type MessageRoute } from "../services/slideRouter";
+import { scoreRefinementIntent, REFINEMENT_SCORE_THRESHOLD, type RefinementContext } from "../services/refinementDetector";
+import { classifyRefinement } from "../services/refinementClassifier";
+import { loadCubeData } from "../services/cubeDataClient";
+import { translateSql } from "../services/sqlTranslator";
+import { composeWithRetry } from "../services/compositionRetry";
+import type { CompositionPlan } from "../services/compositionSchema";
+import { renderVegaToBase64Png } from "../services/vegaRenderer";
+import { logEvent } from "../services/telemetry";
 import { SlidePreview, type SlidePreviewStage } from "./SlidePreview";
+import { RefiningChip } from "./RefiningChip";
+import { SuggestedQuestionsTray } from "./SuggestedQuestionsTray";
 
 const SUMMIT_NAVY = "#0F1330";
 
@@ -40,6 +50,13 @@ interface ChatMessage {
   toolCall?: CubeSqlApiToolCall;
   /** CMPS-03 grounding anchor — Cube AI assistant text captured alongside the toolCall (D-05). */
   commentary?: string;
+  /**
+   * Phase 6 D-03/D-04: When true, this assistant message is the result of a
+   * refinement classification + externally-driven composition (runCompositionForRefinement).
+   * Used by the render branch to mount <SlidePreview skipAutoStart awaitingChoice ... />
+   * instead of the Phase 5 self-driving SlidePreview — prevents double-composition.
+   */
+  isRefinement?: boolean;
 }
 
 const PHASE_LABELS: Record<StreamPhase, string> = {
@@ -48,6 +65,69 @@ const PHASE_LABELS: Record<StreamPhase, string> = {
   streaming: "Building your slide...",
   complete: "",
 };
+
+/**
+ * Phase 6 D-04 helper — delete a previously inserted slide by its captured
+ * Office.js Slide.id. Throws on failure; the caller falls through to
+ * insert-as-new so the user still receives their refined slide.
+ */
+async function deletePriorSlideBySlideId(slideId: string): Promise<void> {
+  await PowerPoint.run(async (context) => {
+    const slides = context.presentation.slides;
+    slides.load("items");
+    await context.sync();
+    for (let i = 0; i < slides.items.length; i++) {
+      slides.items[i].load("id");
+    }
+    await context.sync();
+    const slide = slides.items.find((s) => s.id === slideId);
+    if (!slide) {
+      throw new Error(
+        `Slide with id ${slideId} not found (may have been manually deleted)`
+      );
+    }
+    slide.delete();
+    await context.sync();
+  });
+}
+
+/**
+ * Phase 6 D-04 helper — capture the Office.js Slide.id of the slide that was
+ * JUST inserted. Mirrors the post-insert id-load pattern in
+ * layoutEngine.addSlideAtCurrentPosition. Returns null on failure so the next
+ * turn's Replace silently degrades to insert-as-new (T-06-31 accept).
+ */
+async function captureInsertedSlideId(): Promise<string | null> {
+  try {
+    let captured: string | null = null;
+    await PowerPoint.run(async (context) => {
+      // Selection follows the freshly-inserted slide in PowerPoint Desktop.
+      const selected = context.presentation.getSelectedSlides();
+      selected.load("items");
+      await context.sync();
+      if (selected.items.length === 0) {
+        // Fallback: last slide in deck.
+        const slides = context.presentation.slides;
+        slides.load("items");
+        await context.sync();
+        if (slides.items.length === 0) return;
+        const last = slides.items[slides.items.length - 1];
+        last.load("id");
+        await context.sync();
+        captured = last.id;
+        return;
+      }
+      const slide = selected.items[0];
+      slide.load("id");
+      await context.sync();
+      captured = slide.id;
+    });
+    return captured;
+  } catch (err) {
+    logEvent("replace.capture_id_failed", { err: String(err) });
+    return null;
+  }
+}
 
 const ChatPanel: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -58,6 +138,33 @@ const ChatPanel: React.FC = () => {
   const [chatId, setChatId] = useState<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  // ── Phase 6 D-01/D-02 refinement-chip state ─────────────────────────────
+  const [refinementScore, setRefinementScore] = useState<number>(0);
+  const [chipDismissed, setChipDismissed] = useState<boolean>(false);
+  const [lastSlideTitle, setLastSlideTitle] = useState<string | null>(null);
+  const [lastSlideCreatedAtMs, setLastSlideCreatedAtMs] = useState<
+    number | null
+  >(null);
+
+  // Phase 6 D-04 last-build context — populated at ALL 3 insertion success sites.
+  const lastBuildRef = useRef<{
+    slideId: string | null;
+    toolCall: CubeSqlApiToolCall;
+    rows: unknown[];
+    commentary: string;
+    userQuestion: string;
+    title: string;
+    createdAtMs: number;
+    chatId: string | null;
+  } | null>(null);
+
+  // Phase 6 D-04 awaiting-choice gate (per-message-index).
+  const [awaitingChoiceFor, setAwaitingChoiceFor] = useState<{
+    messageIndex: number;
+    onReplace: () => void;
+    onInsertNew: () => void;
+  } | null>(null);
 
   // Abort in-flight request on unmount (Pitfall 2)
   useEffect(() => {
@@ -70,6 +177,256 @@ const ChatPanel: React.FC = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingContent, phase]);
+
+  // ── 200ms debounced refinement scoring on draft change (D-01) ───────────
+  useEffect(() => {
+    const REFINEMENT_DEBOUNCE_MS = 200; // setTimeout 200 ms — debounce window per 06-UI-SPEC §Refinement Detection.
+    const handle = setTimeout(() => {
+      const ctx: RefinementContext = {
+        lastAssistantSlideState:
+          lastSlideCreatedAtMs !== null ? "created" : undefined,
+        lastSlideCreatedAtMs: lastSlideCreatedAtMs ?? undefined,
+        nowMs: Date.now(),
+      };
+      const score = scoreRefinementIntent(query, ctx);
+      setRefinementScore(score);
+    }, REFINEMENT_DEBOUNCE_MS);
+    return () => clearTimeout(handle);
+  }, [query, lastSlideCreatedAtMs]);
+
+  // Reset chipDismissed when draft clears so a fresh draft re-evaluates from scratch.
+  useEffect(() => {
+    if (query.trim().length === 0) setChipDismissed(false);
+  }, [query]);
+
+  const chipVisible =
+    refinementScore >= REFINEMENT_SCORE_THRESHOLD &&
+    !chipDismissed &&
+    phase === null &&
+    lastSlideTitle !== null;
+
+  /** Map SlidePreviewStage → ChatMessage.slideState (success → created, failed → failed). */
+  const mapStageToSlideState = (
+    s: SlidePreviewStage
+  ): ChatMessage["slideState"] =>
+    s === "success" ? "created" : s === "failed" ? "failed" : s;
+
+  /** Walk backwards from `fromIdx` to find the last user message — question context for SlidePreview. */
+  const findLastUserQuestion = useCallback(
+    (fromIdx: number): string => {
+      for (let i = fromIdx - 1; i >= 0; i--) {
+        if (messages[i].role === "user") return messages[i].content;
+      }
+      return "";
+    },
+    [messages]
+  );
+
+  /**
+   * Phase 6 — central helper that records a successful slide insertion at the
+   * two refinement insertion sites (composer-only + cube-ai+composer). The
+   * Phase 5 new-composition site (#1) writes lastBuildRef inline in its
+   * SlidePreview.onSuccess callback.
+   */
+  const finalizeInsertionSuccess = useCallback(
+    async (
+      messageIndex: number,
+      built: {
+        slideId: string | null;
+        toolCall: CubeSqlApiToolCall;
+        rows: unknown[];
+        commentary: string;
+        userQuestion: string;
+        title: string;
+        chatId: string | null;
+      }
+    ) => {
+      const createdAtMs = Date.now();
+      lastBuildRef.current = {
+        slideId: built.slideId,
+        toolCall: built.toolCall,
+        rows: built.rows,
+        commentary: built.commentary,
+        userQuestion: built.userQuestion,
+        title: built.title,
+        createdAtMs,
+        chatId: built.chatId,
+      };
+      setLastSlideTitle(built.title);
+      setLastSlideCreatedAtMs(createdAtMs);
+      setMessages((prev) =>
+        prev.map((m, i) =>
+          i === messageIndex ? { ...m, slideState: "created" as const } : m
+        )
+      );
+    },
+    []
+  );
+
+  /**
+   * Phase 6 D-03/D-04 — runs composeWithRetry + insertSlide EXTERNALLY for a
+   * refinement message. SlidePreview is mounted with skipAutoStart=true so it
+   * does NOT run its own pipeline — only ONE composition runs per refinement.
+   * After the new slide is inserted, the user picks Replace (delete the prior
+   * slide by id) or Insert as new (leave both).
+   */
+  const runCompositionForRefinement = useCallback(
+    async (
+      messageIndex: number,
+      input: {
+        userQuestion: string;
+        toolCall: CubeSqlApiToolCall;
+        rows: unknown[];
+        commentary: string;
+      }
+    ) => {
+      // Flip message into refinement render mode.
+      setMessages((prev) =>
+        prev.map((m, i) =>
+          i === messageIndex
+            ? { ...m, slideState: "composing", isRefinement: true }
+            : m
+        )
+      );
+
+      const ac = new AbortController();
+      try {
+        // 1) Fetch rows if not cached.
+        let rows = input.rows;
+        if (rows.length === 0) {
+          const cubeQuery = translateSql(input.toolCall.input.sqlQuery);
+          const resp = await loadCubeData(cubeQuery, { signal: ac.signal });
+          rows = resp.data;
+        }
+
+        // 2) Compose.
+        let finalPlan: CompositionPlan | null = null;
+        await composeWithRetry(
+          {
+            userQuestion: input.userQuestion,
+            cubeMeta: {
+              queryTitle: input.toolCall.input.queryTitle,
+              description: input.toolCall.input.description,
+              vegaSpec: input.toolCall.input.vegaSpec,
+              tableChartSpec: input.toolCall.input.tableChartSpec,
+              commentary: input.commentary,
+            },
+            rows,
+            canvas: { widthPx: 960, heightPx: 540 },
+            signal: ac.signal,
+          },
+          {
+            onPartialPlan: () => {
+              /* refinement render branch shows the chooser only — no live preview */
+            },
+            onFinal: (p) => {
+              finalPlan = p;
+            },
+            onError: () => {
+              /* swallow — outer await rejects via composeWithRetry */
+            },
+          },
+          input.toolCall.input.vegaSpec as object | undefined
+        );
+        if (!finalPlan)
+          throw new Error("Composer resolved without finalPlan");
+        // Capture for use inside the chooser handlers (TS narrowing across closures).
+        const plan: CompositionPlan = finalPlan;
+
+        // 3) Optional chart render.
+        const chartPng = plan.chartSpec
+          ? await renderVegaToBase64Png({
+              spec: plan.chartSpec as Record<string, unknown>,
+              rows: rows as Array<Record<string, unknown>>,
+              signal: ac.signal,
+            })
+          : undefined;
+
+        // 4) D-04 Replace-or-Add chooser — surfaced via SlidePreview
+        //    skipAutoStart + awaitingChoice (mounted in the render branch below).
+        await new Promise<void>((resolve) => {
+          const onReplace = async () => {
+            setAwaitingChoiceFor(null);
+            let replacedInPlace = false;
+            if (lastBuildRef.current?.slideId) {
+              try {
+                await deletePriorSlideBySlideId(
+                  lastBuildRef.current.slideId
+                );
+                replacedInPlace = true;
+              } catch (err) {
+                logEvent("replace.delete_failed", { err: String(err) });
+              }
+            }
+            const composed: ComposedSlideContent = {
+              type: "composed",
+              title: plan.title,
+              subtitle: plan.subtitle,
+              commentary: plan.commentary,
+              regions: plan.regions,
+              chartPngBase64: chartPng,
+            };
+            await insertSlide(composed);
+            const newSlideId = await captureInsertedSlideId();
+            await finalizeInsertionSuccess(messageIndex, {
+              slideId: newSlideId,
+              toolCall: input.toolCall,
+              rows,
+              commentary: input.commentary,
+              userQuestion: input.userQuestion,
+              title: plan.title,
+              chatId,
+            });
+            logEvent("refinement.replace_applied", { replacedInPlace });
+            resolve();
+          };
+
+          const onInsertNew = async () => {
+            setAwaitingChoiceFor(null);
+            const composed: ComposedSlideContent = {
+              type: "composed",
+              title: plan.title,
+              subtitle: plan.subtitle,
+              commentary: plan.commentary,
+              regions: plan.regions,
+              chartPngBase64: chartPng,
+            };
+            await insertSlide(composed);
+            const newSlideId = await captureInsertedSlideId();
+            await finalizeInsertionSuccess(messageIndex, {
+              slideId: newSlideId,
+              toolCall: input.toolCall,
+              rows,
+              commentary: input.commentary,
+              userQuestion: input.userQuestion,
+              title: plan.title,
+              chatId,
+            });
+            logEvent("refinement.insert_new_applied", {});
+            resolve();
+          };
+
+          setAwaitingChoiceFor({ messageIndex, onReplace, onInsertNew });
+        });
+      } catch (err) {
+        setAwaitingChoiceFor(null);
+        const msg = err instanceof Error ? err.message : String(err);
+        setMessages((prev) =>
+          prev.map((m, i) =>
+            i === messageIndex
+              ? {
+                  ...m,
+                  slideState: "failed" as const,
+                  error: { message: msg, type: "unknown", retryable: false },
+                }
+              : m
+          )
+        );
+        logEvent("refinement.failed", { err: msg });
+      }
+    },
+    [chatId, finalizeInsertionSuccess]
+  );
 
   const handleSubmit = useCallback(
     (question: string) => {
@@ -86,6 +443,11 @@ const ChatPanel: React.FC = () => {
       let capturedToolCall: CubeSqlApiToolCall | null = null;
       let capturedCommentary = "";
 
+      // Snapshot refinement-chip state at submit time (debounce may race with submit).
+      const isRefinementFlow = chipVisible;
+      // Snapshot the title before the stream finishes — needed by classifier prompt.
+      const submitLastSlideTitle = lastSlideTitle;
+
       const controller = streamCubeAI(wrappedQuestion, chatId, {
         onPhaseChange: (p: StreamPhase) => setPhase(p),
         onContent: (content: string) => {
@@ -98,29 +460,82 @@ const ChatPanel: React.FC = () => {
         onToolCall: (tc: CubeSqlApiToolCall) => {
           capturedToolCall = tc;
         },
-        onComplete: (result: CubeAIStreamResult) => {
+        onComplete: async (result: CubeAIStreamResult) => {
           const raw = result.content || "";
           const parsed = extractSlideContent(raw);
           const displayText = parsed
             ? summarizeSlideContent(parsed)
             : raw || "(No response received)";
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "assistant",
-              content: displayText,
-              rawContent: raw,
-              slideState: "idle",
-              toolCall: capturedToolCall ?? undefined,
-              // CMPS-03 grounding anchor: non-empty when Cube AI streamed both
-              // a toolCall and assistant content in the same stream. Threaded
-              // to composer.cubeMeta.commentary via SlidePreview.
-              commentary: capturedCommentary || raw || undefined,
-            },
-          ]);
+
+          // Append assistant message and capture its index for downstream wiring.
+          let newMsgIdx = -1;
+          setMessages((prev) => {
+            newMsgIdx = prev.length;
+            return [
+              ...prev,
+              {
+                role: "assistant",
+                content: displayText,
+                rawContent: raw,
+                slideState: "idle",
+                toolCall: capturedToolCall ?? undefined,
+                // CMPS-03 grounding anchor.
+                commentary: capturedCommentary || raw || undefined,
+              },
+            ];
+          });
           setStreamingContent("");
           setPhase(null);
           if (result.chatId) setChatId(result.chatId);
+
+          // Phase 6 routing — decide branch.
+          const ctxRoute = {
+            refinementChipVisible: isRefinementFlow,
+            lastSlideTitle: submitLastSlideTitle ?? undefined,
+            // Section-plan routing is delegated to 06-07 (planSection preflight).
+            // For Plan 06-06, "force-single" pins routeMessage to single-slide paths;
+            // 06-07 will replace this with planSection's allow-multi/force-single decision.
+            sectionPlanHint: "force-single" as const,
+          };
+          const route: MessageRoute = routeMessage(
+            { toolCall: capturedToolCall },
+            ctxRoute
+          );
+
+          if (
+            route === "refinement" &&
+            capturedToolCall &&
+            lastBuildRef.current
+          ) {
+            const routing = await classifyRefinement(
+              question,
+              submitLastSlideTitle ?? "",
+              controller.signal
+            );
+            if (routing.path === "composer-only") {
+              const last = lastBuildRef.current;
+              await runCompositionForRefinement(newMsgIdx, {
+                userQuestion: `${last.userQuestion}\n\nREFINEMENT: ${question}`,
+                toolCall: last.toolCall,
+                rows: last.rows,
+                commentary: last.commentary,
+              });
+            } else {
+              // cube-ai+composer: streamCubeAI already ran and produced a NEW
+              // toolCall under the SAME chatId (CUBE-03 thread continuity).
+              await runCompositionForRefinement(newMsgIdx, {
+                userQuestion: question,
+                toolCall: capturedToolCall,
+                rows: [],
+                commentary: capturedCommentary || raw,
+              });
+            }
+            return;
+          }
+
+          // route === "new-composition" or "narrative":
+          // Preserve Phase 5 behavior — message sits with slideState: "idle"
+          // and the user clicks "Create Slide". Section-plan branch lives in 06-07.
         },
         onError: (error: CubeAIError) => {
           setMessages((prev) => [...prev, { role: "error", content: error.message, error }]);
@@ -131,65 +546,111 @@ const ChatPanel: React.FC = () => {
 
       controllerRef.current = controller;
     },
-    [phase, chatId]
+    [phase, chatId, chipVisible, lastSlideTitle, runCompositionForRefinement]
   );
 
   const handleRetry = useCallback(() => {
     if (lastQuestion) handleSubmit(lastQuestion);
   }, [lastQuestion, handleSubmit]);
 
-  const handleCreateSlide = useCallback(async (messageIndex: number) => {
-    const msg = messages[messageIndex];
-    if (!msg || msg.role !== "assistant" || msg.slideState !== "idle") return;
+  const handleCreateSlide = useCallback(
+    async (messageIndex: number) => {
+      const msg = messages[messageIndex];
+      if (!msg || msg.role !== "assistant" || msg.slideState !== "idle") return;
 
-    // Phase 5 D-02: if Cube AI emitted a finalised cubeSqlApi toolCall, hand off
-    // to SlidePreview (composition pipeline). SlidePreview owns the lifecycle;
-    // this handler just flips slideState so the render branch mounts the preview.
-    if (routeCreateSlide(msg) === "composition") {
+      // Phase 5 D-02: if Cube AI emitted a finalised cubeSqlApi toolCall, hand off
+      // to SlidePreview (composition pipeline). SlidePreview owns the lifecycle;
+      // this handler just flips slideState so the render branch mounts the preview.
+      if (routeCreateSlide(msg) === "composition") {
+        setMessages((prev) =>
+          prev.map((m, i) =>
+            i === messageIndex
+              ? { ...m, slideState: "fetching-data" as const }
+              : m
+          )
+        );
+        return;
+      }
+
+      // Legacy narrative path — unchanged.
       setMessages((prev) =>
-        prev.map((m, i) => (i === messageIndex ? { ...m, slideState: "fetching-data" as const } : m))
+        prev.map((m, i) =>
+          i === messageIndex ? { ...m, slideState: "creating" as const } : m
+        )
       );
-      return;
-    }
 
-    // Legacy narrative path — unchanged.
-    setMessages(prev => prev.map((m, i) =>
-      i === messageIndex ? { ...m, slideState: "creating" as const } : m
-    ));
+      try {
+        const sourceText = msg.rawContent || msg.content;
+        const content =
+          extractSlideContent(sourceText) ?? fallbackToTextOnly(sourceText);
+        await insertSlide(content);
+        // ── Insertion site #3 (narrative path) — write lastBuildRef.
+        const slideId = await captureInsertedSlideId();
+        const titleFromContent = (content as { title?: string }).title ?? "Your slide";
+        lastBuildRef.current = {
+          slideId,
+          toolCall:
+            msg.toolCall ??
+            ({
+              name: "cubeSqlApi",
+              isInProcess: false,
+              input: {
+                sqlQuery: "",
+                queryTitle: titleFromContent,
+                description: "",
+                chartCategory: "table",
+              },
+            } as unknown as CubeSqlApiToolCall),
+          rows: [],
+          commentary: msg.commentary ?? "",
+          userQuestion: findLastUserQuestion(messageIndex) || msg.content,
+          title: titleFromContent,
+          createdAtMs: Date.now(),
+          chatId,
+        };
+        setLastSlideTitle(titleFromContent);
+        setLastSlideCreatedAtMs(Date.now());
+        setMessages((prev) =>
+          prev.map((m, i) =>
+            i === messageIndex ? { ...m, slideState: "created" as const } : m
+          )
+        );
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        setMessages((prev) =>
+          prev.map((m, i) =>
+            i === messageIndex
+              ? {
+                  ...m,
+                  slideState: "failed" as const,
+                  error: {
+                    message: errMsg,
+                    type: "unknown" as const,
+                    retryable: false,
+                  },
+                }
+              : m
+          )
+        );
+      }
+    },
+    [messages, chatId, findLastUserQuestion]
+  );
 
-    try {
-      const sourceText = msg.rawContent || msg.content;
-      const content = extractSlideContent(sourceText) ?? fallbackToTextOnly(sourceText);
-      await insertSlide(content);
-      setMessages(prev => prev.map((m, i) =>
-        i === messageIndex ? { ...m, slideState: "created" as const } : m
-      ));
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      setMessages(prev => prev.map((m, i) =>
-        i === messageIndex ? { ...m, slideState: "failed" as const, error: { message: errMsg, type: "unknown" as const, retryable: false } } : m
-      ));
-    }
-  }, [messages]);
-
-  /** Map SlidePreviewStage → ChatMessage.slideState (success → created, failed → failed). */
-  const mapStageToSlideState = (s: SlidePreviewStage): ChatMessage["slideState"] =>
-    s === "success" ? "created" : s === "failed" ? "failed" : s;
-
-  /** Walk backwards from `fromIdx` to find the last user message — question context for SlidePreview. */
-  const findLastUserQuestion = (fromIdx: number): string => {
-    for (let i = fromIdx - 1; i >= 0; i--) {
-      if (messages[i].role === "user") return messages[i].content;
-    }
-    return "";
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(query.trim());
-    }
-  };
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Escape" && chipVisible) {
+        e.preventDefault();
+        setChipDismissed(true);
+        return;
+      }
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSubmit(query.trim());
+      }
+    },
+    [chipVisible, query, handleSubmit]
+  );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
@@ -204,7 +665,7 @@ const ChatPanel: React.FC = () => {
           gap: "4px",
         }}
       >
-        {/* Welcome state */}
+        {/* Welcome state — heading/body preserved; suggestion-button block deleted (Phase 6 D-12). */}
         {messages.length === 0 && !phase && (
           <div style={{ textAlign: "center", marginTop: "40px", padding: "0 12px" }}>
             <Text weight="semibold" size={400} block>
@@ -213,39 +674,6 @@ const ChatPanel: React.FC = () => {
             <Text size={300} style={{ color: "#616161", marginTop: "8px", display: "block" }}>
               Ask a question and Summit will create a data-driven slide for your deck.
             </Text>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "24px" }}>
-              {[
-                "What were total sales last quarter?",
-                "Show me the top 5 products by revenue",
-                "Compare regional performance year over year",
-              ].map((suggestion) => (
-                <button
-                  key={suggestion}
-                  onClick={() => { setQuery(suggestion); handleSubmit(suggestion); }}
-                  style={{
-                    padding: "10px 14px",
-                    borderRadius: "10px",
-                    border: "1px solid rgba(15, 19, 48, 0.12)",
-                    backgroundColor: "rgba(255, 255, 255, 0.7)",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    fontSize: "13px",
-                    color: SUMMIT_NAVY,
-                    transition: "background-color 0.15s, border-color 0.15s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "rgba(15, 19, 48, 0.06)";
-                    e.currentTarget.style.borderColor = "rgba(15, 19, 48, 0.25)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.7)";
-                    e.currentTarget.style.borderColor = "rgba(15, 19, 48, 0.12)";
-                  }}
-                >
-                  {suggestion}
-                </button>
-              ))}
-            </div>
           </div>
         )}
 
@@ -295,9 +723,35 @@ const ChatPanel: React.FC = () => {
                     Create Slide
                   </Button>
                 )}
-                {(msg.slideState === "fetching-data" ||
-                  msg.slideState === "composing" ||
-                  msg.slideState === "rendering") &&
+
+                {/* Phase 6 refinement render branch — SlidePreview skipAutoStart so
+                    runCompositionForRefinement is the SOLE composition driver (no double
+                    composition). The chooser appears once awaitingChoiceFor is wired. */}
+                {msg.isRefinement && msg.toolCall && (
+                  <SlidePreview
+                    toolCall={msg.toolCall}
+                    userQuestion={findLastUserQuestion(i) || msg.content}
+                    commentary={msg.commentary ?? ""}
+                    skipAutoStart
+                    onStageChange={() => {}}
+                    onSuccess={() => {}}
+                    onError={() => {}}
+                    awaitingChoice={
+                      awaitingChoiceFor?.messageIndex === i
+                        ? {
+                            onReplace: awaitingChoiceFor.onReplace,
+                            onInsertNew: awaitingChoiceFor.onInsertNew,
+                          }
+                        : undefined
+                    }
+                  />
+                )}
+
+                {/* Phase 5 self-driving SlidePreview — UNCHANGED for new-composition path. */}
+                {!msg.isRefinement &&
+                  (msg.slideState === "fetching-data" ||
+                    msg.slideState === "composing" ||
+                    msg.slideState === "rendering") &&
                   msg.toolCall && (
                     <SlidePreview
                       toolCall={msg.toolCall}
@@ -306,21 +760,46 @@ const ChatPanel: React.FC = () => {
                       onStageChange={(s) =>
                         setMessages((prev) =>
                           prev.map((m, idx) =>
-                            idx === i ? { ...m, slideState: mapStageToSlideState(s) } : m
+                            idx === i
+                              ? { ...m, slideState: mapStageToSlideState(s) }
+                              : m
                           )
                         )
                       }
-                      onSuccess={() =>
+                      onSuccess={async () => {
+                        // ── Insertion site #1 (Phase 5 new-composition success) — write lastBuildRef.
                         setMessages((prev) =>
                           prev.map((m, idx) =>
-                            idx === i ? { ...m, slideState: "created" as const } : m
+                            idx === i
+                              ? { ...m, slideState: "created" as const }
+                              : m
                           )
-                        )
-                      }
+                        );
+                        if (msg.toolCall) {
+                          const title =
+                            msg.toolCall.input.queryTitle || "Your slide";
+                          const slideId = await captureInsertedSlideId();
+                          lastBuildRef.current = {
+                            slideId,
+                            toolCall: msg.toolCall,
+                            rows: [],
+                            commentary: msg.commentary ?? "",
+                            userQuestion:
+                              findLastUserQuestion(i) || msg.content,
+                            title,
+                            createdAtMs: Date.now(),
+                            chatId,
+                          };
+                          setLastSlideTitle(title);
+                          setLastSlideCreatedAtMs(Date.now());
+                        }
+                      }}
                       onError={() =>
                         setMessages((prev) =>
                           prev.map((m, idx) =>
-                            idx === i ? { ...m, slideState: "failed" as const } : m
+                            idx === i
+                              ? { ...m, slideState: "failed" as const }
+                              : m
                           )
                         )
                       }
@@ -352,9 +831,13 @@ const ChatPanel: React.FC = () => {
                     <Button
                       size="small"
                       onClick={() => {
-                        setMessages(prev => prev.map((m, idx) =>
-                          idx === i ? { ...m, slideState: "idle" as const } : m
-                        ));
+                        setMessages((prev) =>
+                          prev.map((m, idx) =>
+                            idx === i
+                              ? { ...m, slideState: "idle" as const }
+                              : m
+                          )
+                        );
                       }}
                       style={{ marginLeft: "8px" }}
                     >
@@ -410,6 +893,16 @@ const ChatPanel: React.FC = () => {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Phase 6 D-02 — Refining chip (above input). */}
+      {chipVisible && lastSlideTitle && (
+        <div style={{ padding: "0 8px" }}>
+          <RefiningChip
+            slideTitle={lastSlideTitle}
+            onDismiss={() => setChipDismissed(true)}
+          />
+        </div>
+      )}
+
       {/* Input area */}
       <div
         style={{
@@ -441,6 +934,15 @@ const ChatPanel: React.FC = () => {
           Go
         </Button>
       </div>
+
+      {/* Phase 6 D-12 — Suggested-questions tray (below input). Hidden during in-flight builds. */}
+      <SuggestedQuestionsTray
+        onSelect={(prompt) => {
+          setQuery(prompt);
+          handleSubmit(prompt);
+        }}
+        disabled={phase !== null}
+      />
     </div>
   );
 };
