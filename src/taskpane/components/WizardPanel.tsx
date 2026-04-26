@@ -30,6 +30,22 @@ const WizardPanel: React.FC = () => {
   // without triggering re-renders mid-stream.
   const toolCallRef = useRef<CubeSqlApiToolCall | null>(null);
   const commentaryRef = useRef<string>("");
+  // Phase 6 Wave 7 D-16 — chatId surfaced from streamCubeAI for the cube-ai+composer
+  // refinement path (D-03). Captured in onComplete and threaded into ReviewStep so
+  // refinements continue the same Cube AI conversation thread.
+  const chatIdRef = useRef<string | null>(null);
+
+  // Phase 6 Wave 7 — last-build context for the Wizard refinement affordance.
+  // Populated AFTER buildState transitions to "built" (i.e., after SlidePreview's
+  // onSuccess fires for the composed path, or after the legacy narrative path
+  // resolves). ReviewStep reads this to drive D-03-aware refinement routing.
+  const [lastBuildContext, setLastBuildContext] = useState<{
+    toolCall: CubeSqlApiToolCall | null;
+    commentary: string;
+    lastSlideTitle: string;
+    chatId: string | null;
+    rows: unknown[];
+  } | null>(null);
 
   // Abort in-flight request on unmount
   useEffect(() => {
@@ -86,6 +102,8 @@ const WizardPanel: React.FC = () => {
       onComplete: async (result) => {
         try {
           const raw = result.content || "";
+          // Phase 6 Wave 7 — capture chatId for D-03 cube-ai+composer refinements.
+          chatIdRef.current = result.chatId ?? null;
           // Phase 5 D-02: if Cube AI emitted a finalised cubeSqlApi toolCall,
           // hand off to SlidePreview (ReviewStep mounts it). CMPS-03 ensures
           // the commentary ref is populated before SlidePreview reads it.
@@ -97,6 +115,17 @@ const WizardPanel: React.FC = () => {
           // Legacy narrative fallback — unchanged.
           const content = extractSlideContent(raw) ?? fallbackToTextOnly(raw);
           await insertSlide(content, data.productImageBase64 ?? undefined);
+          // Phase 6 Wave 7 — narrative path has no toolCall; lastBuildContext
+          // toolCall remains null so ReviewStep's refinement routing falls
+          // back to cube-ai+composer (the safer route per Phase 6 decision log).
+          setLastBuildContext({
+            toolCall: null,
+            commentary: raw,
+            lastSlideTitle:
+              (content as { title?: string }).title ?? "Your slide",
+            chatId: chatIdRef.current,
+            rows: [],
+          });
           setBuildState("built");
         } catch {
           setBuildState("failed");
@@ -118,6 +147,7 @@ const WizardPanel: React.FC = () => {
     setStep(1);
     setData(DEFAULT_DATA);
     setBuildState("idle");
+    setLastBuildContext(null);
   }, []);
 
   const renderStep = () => {
@@ -137,8 +167,24 @@ const WizardPanel: React.FC = () => {
             onReset={handleReset}
             toolCall={toolCallRef.current}
             commentary={commentaryRef.current}
-            onBuildStateChange={(next) => setBuildState(next)}
+            onBuildStateChange={(next) => {
+              // Phase 6 Wave 7 — when the composition-path SlidePreview reports
+              // success ("built"), capture lastBuildContext for the refinement
+              // affordance. The narrative path captures via onComplete above.
+              if (next === "built" && toolCallRef.current) {
+                setLastBuildContext({
+                  toolCall: toolCallRef.current,
+                  commentary: commentaryRef.current ?? "",
+                  lastSlideTitle:
+                    toolCallRef.current.input.queryTitle ?? "Your slide",
+                  chatId: chatIdRef.current,
+                  rows: [],
+                });
+              }
+              setBuildState(next);
+            }}
             mapStageToBuildState={mapStageToBuildState}
+            lastBuildContext={lastBuildContext}
           />
         );
       default:
