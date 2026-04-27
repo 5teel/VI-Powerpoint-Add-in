@@ -247,6 +247,26 @@ describe("streamCubeAI", () => {
     expect(error.retryable).toBe(true);
   });
 
+  it("surfaces JSON-RPC error when response is a single line with no trailing newline", async () => {
+    // Cube AI returns HTTP 200 + a single JSON-RPC error line with NO trailing
+    // newline when the agent has no deployment associated. Without the
+    // buffer-flush error check this would silently produce empty content and
+    // surface as the generic "(No response received)" placeholder in chat.
+    const errorLine = '{"jsonrpc":"2.0","id":null,"error":{"code":-32603,"message":"Agent does not have a deployment associated"}}';
+    vi.stubGlobal("fetch", async () => createMockStream([errorLine]));
+
+    const callbacks = createMockCallbacks();
+    streamCubeAI("test", null, callbacks);
+    await waitForStream(callbacks);
+
+    expect(callbacks.onError).toHaveBeenCalledTimes(1);
+    const error: CubeAIError = (callbacks.onError as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(error.message).toBe("Agent does not have a deployment associated");
+    expect(error.type).toBe("server");
+    expect(error.retryable).toBe(true);
+    expect(callbacks.onComplete).not.toHaveBeenCalled();
+  });
+
   it("classifies empty response body as empty error", async () => {
     vi.stubGlobal("fetch", async () => {
       return { ok: true, status: 200, body: null, headers: new Headers() };

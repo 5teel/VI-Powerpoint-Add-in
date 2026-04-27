@@ -244,6 +244,18 @@ export function streamCubeAI(
       if (buffer.trim()) {
         try {
           const message = JSON.parse(buffer);
+          // Mirror the streaming-loop check: a single-line JSON-RPC error with
+          // no trailing newline (e.g. "Agent does not have a deployment
+          // associated") would otherwise be swallowed and surface as the
+          // generic "(No response received)" placeholder.
+          if (message.error?.message) {
+            callbacks.onError({
+              message: message.error.message,
+              type: "server",
+              retryable: true,
+            });
+            return;
+          }
           if (message.state?.chatId) {
             responseChatId = message.state.chatId;
           }
