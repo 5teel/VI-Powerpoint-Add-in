@@ -22,3 +22,12 @@
 (globalThis as unknown as { Office: unknown }).Office = {
   context: { requirements: { isSetSupported: () => false } },
 };
+
+// Phase 7 Wave 0 — jsdom doesn't implement scrollIntoView, but ChatPanel uses
+// it in a useEffect. Stub it here so component tests render without throwing.
+// Only applies in jsdom env (Element exists); node-env tests are unaffected.
+if (typeof Element !== "undefined" && !Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = function scrollIntoView() {
+    /* no-op stub for jsdom */
+  };
+}

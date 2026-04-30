@@ -1,0 +1,49 @@
+{
+  "_comment": "PROVISIONAL SEED FIXTURES — Task 3 illustrative samples. Replaced by Task 4 (07-01 checkpoint:human-action) with REAL Cube AI captures from the deployed Railway build. Per Pitfall 7, the responseClassifierSystem.ts prompt body (Wave 1) MUST ground its per-class examples in real assistant text, not these seeds.",
+  "_status": "PROVISIONAL",
+  "_capturedAgainst": null,
+  "samples": [
+    {
+      "class": "clarify",
+      "userQuestion": "show me sales",
+      "assistantText": "Did you mean by store, by region, or by category? I can also break it down by time period if you have a window in mind.",
+      "toolCallPresent": false,
+      "lastSlideTitle": null
+    },
+    {
+      "class": "data",
+      "userQuestion": "what was Q3 revenue",
+      "assistantText": "Q3 revenue was $4.2B, up 12% year-over-year, with NSW leading at $1.4B.",
+      "toolCallPresent": true,
+      "lastSlideTitle": null
+    },
+    {
+      "class": "modify",
+      "userQuestion": "filter to top 5 stores",
+      "assistantText": "Filtering to the top 5 stores by sales volume — here are the updated numbers.",
+      "toolCallPresent": true,
+      "lastSlideTitle": "Sales by Store"
+    },
+    {
+      "class": "variant",
+      "userQuestion": "make it a pie chart",
+      "assistantText": "Switched to a pie chart so the share of total is more obvious.",
+      "toolCallPresent": true,
+      "lastSlideTitle": "Sales by State"
+    },
+    {
+      "class": "section",
+      "userQuestion": "give me a Q3 review",
+      "assistantText": "Q3 highlights: revenue $4.2B (up 12% YoY), NSW leads at $1.4B (33% share), top category is fuel ($2.1B), top store cluster grew 18%, week-over-week trend was positive in 9 of 13 weeks. Margin compressed 80bps due to fuel mix. Outlook: Q4 guidance maintained.",
+      "toolCallPresent": true,
+      "lastSlideTitle": null
+    },
+    {
+      "class": "refuse",
+      "userQuestion": "predict next quarter",
+      "assistantText": "I don't have forecasting capabilities — I can only report on data already in the warehouse.",
+      "toolCallPresent": false,
+      "lastSlideTitle": null
+    }
+  ]
+}
