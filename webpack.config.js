@@ -1,5 +1,7 @@
 /* eslint-disable no-undef */
 
+require("dotenv").config();
+
 const webpack = require("webpack");
 const devCerts = require("office-addin-dev-certs");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
@@ -23,6 +25,7 @@ module.exports = async (env, options) => {
     },
     output: {
       clean: true,
+      filename: dev ? "[name].js" : "[name].[contenthash].js",
     },
     resolve: {
       extensions: [".ts", ".tsx", ".html", ".js"],
