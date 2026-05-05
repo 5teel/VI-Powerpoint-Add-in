@@ -27,6 +27,8 @@ import { composeWithRetry } from "../services/compositionRetry";
 import type { CompositionPlan } from "../services/compositionSchema";
 import { renderVegaToBase64Png } from "../services/vegaRenderer";
 import { logEvent } from "../services/telemetry";
+import { evaluateImageNeed } from "../services/imageEvaluator";
+import { generateImage } from "../services/imageGenerator";
 import { SlidePreview, type SlidePreviewStage } from "./SlidePreview";
 import { RefiningChip } from "./RefiningChip";
 import { SuggestedQuestionsTray } from "./SuggestedQuestionsTray";
@@ -293,6 +295,7 @@ const ChatPanel: React.FC = () => {
         toolCall: CubeSqlApiToolCall;
         rows: unknown[];
         commentary: string;
+        generatedImageBase64?: string;
       }
     ) => {
       // Flip message into refinement render mode.
@@ -328,6 +331,7 @@ const ChatPanel: React.FC = () => {
             },
             rows,
             canvas: { widthPx: 960, heightPx: 540 },
+            generatedImageBase64: input.generatedImageBase64,
             signal: ac.signal,
           },
           {
@@ -380,6 +384,7 @@ const ChatPanel: React.FC = () => {
               commentary: plan.commentary,
               regions: plan.regions,
               chartPngBase64: chartPng,
+              generatedImageBase64: input.generatedImageBase64,
             };
             await insertSlide(composed);
             const newSlideId = await captureInsertedSlideId();
@@ -405,6 +410,7 @@ const ChatPanel: React.FC = () => {
               commentary: plan.commentary,
               regions: plan.regions,
               chartPngBase64: chartPng,
+              generatedImageBase64: input.generatedImageBase64,
             };
             await insertSlide(composed);
             const newSlideId = await captureInsertedSlideId();
@@ -443,9 +449,94 @@ const ChatPanel: React.FC = () => {
     [chatId, finalizeInsertionSuccess]
   );
 
+  // Detect explicit "add an image" requests so they bypass Cube AI and route
+  // directly to image generation against the last slide's context.
+  const isImageAddRequest = (q: string): boolean =>
+    /\b(add|include|insert|attach|put|show|generate|get)\b.{0,25}\b(image|photo|picture|visual|illustration)\b/i.test(q) ||
+    /\b(image|photo|picture|visual|illustration)\b.{0,20}\b(please|add|include|insert|to (the|my|this) slide)\b/i.test(q);
+
+  const handleAddImageToSlide = useCallback(
+    (question: string) => {
+      const last = lastBuildRef.current;
+      if (!last) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "user", content: question },
+          {
+            role: "error",
+            content: "Create a slide first — I need a slide to add an image to.",
+            error: { message: "No slide context", type: "unknown" as const, retryable: false },
+          },
+        ]);
+        setQuery("");
+        return;
+      }
+
+      let newMsgIdx = -1;
+      setMessages((prev) => {
+        newMsgIdx = prev.length + 1; // +1 because user msg comes first
+        return [
+          ...prev,
+          { role: "user", content: question },
+          {
+            role: "assistant",
+            content: "Generating an AI image for your slide…",
+            slideState: "composing" as const,
+            toolCall: last.toolCall,
+            commentary: last.commentary,
+            isRefinement: true,
+          },
+        ];
+      });
+      setQuery("");
+
+      (async () => {
+        try {
+          // Get an image prompt from the slide context, fall back to slide title.
+          let imagePrompt = `${last.title}, photorealistic, no text or labels`;
+          try {
+            const evalResult = await evaluateImageNeed(
+              last.userQuestion,
+              last.commentary,
+              last.toolCall.input.queryTitle
+            );
+            if (evalResult.needed && evalResult.prompt) imagePrompt = evalResult.prompt;
+          } catch {
+            // use fallback prompt
+          }
+
+          const generatedImageBase64 = await generateImage(imagePrompt);
+
+          await runCompositionForRefinement(newMsgIdx, {
+            userQuestion: last.userQuestion,
+            toolCall: last.toolCall,
+            rows: last.rows,
+            commentary: last.commentary,
+            generatedImageBase64,
+          });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Failed to generate image.";
+          setMessages((prev) =>
+            prev.map((m, i) =>
+              i === newMsgIdx
+                ? { ...m, slideState: "failed" as const, error: { message: msg, type: "unknown" as const, retryable: true } }
+                : m
+            )
+          );
+        }
+      })();
+    },
+    [lastBuildRef, runCompositionForRefinement]
+  );
+
   const handleSubmit = useCallback(
     (question: string) => {
       if (!question.trim() || phase !== null) return;
+
+      if (isImageAddRequest(question)) {
+        handleAddImageToSlide(question);
+        return;
+      }
 
       setLastQuestion(question);
       setMessages((prev) => [...prev, { role: "user", content: question }]);
@@ -663,7 +754,7 @@ const ChatPanel: React.FC = () => {
 
       controllerRef.current = controller;
     },
-    [phase, chatId, chipVisible, lastSlideTitle, runCompositionForRefinement]
+    [phase, chatId, chipVisible, lastSlideTitle, runCompositionForRefinement, handleAddImageToSlide]
   );
 
   const handleStopQuery = useCallback(() => {

@@ -109,19 +109,28 @@ export async function renderComposedSlide(content: ComposedSlideContent): Promis
           if (content.calloutText) addCalloutBox(shapes, content.calloutText, rect);
           break;
         case "chart": {
-          if (!content.chartPngBase64) break;
-          const shape = shapes.addGeometricShape(
-            PowerPoint.GeometricShapeType.rectangle,
-            {
+          // Always lay down a white background to cover any slide-layout placeholder.
+          // Without this, a missing or empty chart PNG leaves the grey "Chart Area"
+          // PowerPoint placeholder visible behind the region.
+          const bg = shapes.addGeometricShape(PowerPoint.GeometricShapeType.rectangle, {
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height,
+          });
+          bg.fill.setSolidColor("FFFFFF");
+          bg.lineFormat.weight = 0;
+          if (content.chartPngBase64) {
+            const shape = shapes.addGeometricShape(PowerPoint.GeometricShapeType.rectangle, {
               left: rect.left,
               top: rect.top,
               width: rect.width,
               height: rect.height,
-            }
-          );
-          shape.fill.setImage(content.chartPngBase64);
-          shape.lineFormat.weight = 0;
-          shape.altTextDescription = content.title;
+            });
+            shape.fill.setImage(content.chartPngBase64);
+            shape.lineFormat.weight = 0;
+            shape.altTextDescription = content.title;
+          }
           break;
         }
         case "image": {

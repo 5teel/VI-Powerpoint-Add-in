@@ -54,6 +54,7 @@ export const COMPOSER_SYSTEM_PROMPT_V1 = `You are a senior BI analyst and presen
 - When highlighting a specific datum (D-10), use colour override on that mark, not a separate layer with a different mark.
 - Set the chart font to "Segoe UI" for consistency with the slide typography. Background white (#FFFFFF).
 - Do not include width or height in the chartSpec — the renderer applies canvas-appropriate dimensions.
+- CRITICAL — field names in chartSpec.encoding MUST exactly match the column key names as they appear in the rows JSON. Cube REST rows use namespaced keys (e.g., "products.brand_name", "orders.sales_amount"), NOT the abbreviated names the original vegaSpec may have used (e.g., "brand", "sales"). Before emitting chartSpec, inspect the first row of the rows JSON to find the actual key names. Update every field reference in encoding.x, encoding.y, encoding.color, encoding.size, and encoding.tooltip to use those exact row key strings. A mismatched field name produces a blank chart.
 </CHART_MUTATION_RULES>
 
 <TABLE_RENDER_RULES>
@@ -175,6 +176,7 @@ export const COMPOSER_SYSTEM_PROMPT_V2 = `You are a senior BI analyst and presen
 - When highlighting a specific datum (D-10), use colour override on that mark, not a separate layer with a different mark.
 - Set the chart font to "Segoe UI" for consistency with the slide typography. Background white (#FFFFFF).
 - Do not include width or height in the chartSpec — the renderer applies canvas-appropriate dimensions.
+- CRITICAL — field names in chartSpec.encoding MUST exactly match the column key names as they appear in the rows JSON. Cube REST rows use namespaced keys (e.g., "products.brand_name", "orders.sales_amount"), NOT the abbreviated names the original vegaSpec may have used (e.g., "brand", "sales"). Before emitting chartSpec, inspect the first row of the rows JSON to find the actual key names. Update every field reference in encoding.x, encoding.y, encoding.color, encoding.size, and encoding.tooltip to use those exact row key strings. A mismatched field name produces a blank chart.
 </CHART_MUTATION_RULES>
 
 <TABLE_RENDER_RULES>
