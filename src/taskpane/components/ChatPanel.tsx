@@ -666,6 +666,12 @@ const ChatPanel: React.FC = () => {
     [phase, chatId, chipVisible, lastSlideTitle, runCompositionForRefinement]
   );
 
+  const handleStopQuery = useCallback(() => {
+    controllerRef.current?.abort();
+    setPhase(null);
+    setStreamingContent("");
+  }, []);
+
   const handleRetry = useCallback(() => {
     if (lastQuestion) handleSubmit(lastQuestion);
   }, [lastQuestion, handleSubmit]);
@@ -1043,10 +1049,14 @@ const ChatPanel: React.FC = () => {
           </div>
         )}
 
-        {/* Phase-based spinner (per D-07, D-08) */}
+        {/* Phase-based spinner with stop control */}
         {phase && phase !== "complete" && (
           <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 0" }}>
-            <Spinner size="small" label={PHASE_LABELS[phase]} />
+            <Spinner size="tiny" />
+            <Text size={200} style={{ color: "#6B7280", flex: 1 }}>{PHASE_LABELS[phase]}</Text>
+            <Button size="small" appearance="subtle" onClick={handleStopQuery}>
+              Stop
+            </Button>
           </div>
         )}
 

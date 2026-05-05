@@ -55,13 +55,28 @@ export interface StreamCallbacks {
  * Returns an AbortController so the caller can cancel the request (e.g., on unmount).
  * The async work runs inside an IIFE so this function returns synchronously.
  */
+// How long with no new bytes before we consider the stream stalled mid-response.
+const STREAM_STALL_MS = 30_000;
+
 export function streamCubeAI(
   question: string,
   chatId: string | null,
   callbacks: StreamCallbacks
 ): AbortController {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), CUBEAI_CONFIG.timeoutMs);
+
+  // Track WHY we aborted so catch blocks can surface the right message.
+  // User/unmount abort leaves both false → silent exit.
+  let timedOut = false;
+  let stallTimedOut = false;
+
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, CUBEAI_CONFIG.timeoutMs);
+
+  // Hoisted so finally can always clear it, even if connect never reached.
+  let stallTimer: ReturnType<typeof setTimeout> | null = null;
 
   callbacks.onPhaseChange("connecting");
 
@@ -85,8 +100,17 @@ export function streamCubeAI(
           signal: controller.signal,
         });
       } catch (err) {
-        // Do not report errors if the caller intentionally aborted
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted) {
+          // Distinguish timeout/stall from user-initiated stop (silent).
+          if (timedOut || stallTimedOut) {
+            callbacks.onError({
+              message: "Cube AI took too long to respond. Please try again.",
+              type: "timeout",
+              retryable: true,
+            });
+          }
+          return;
+        }
 
         const errorMsg = String(err);
 
@@ -95,14 +119,6 @@ export function streamCubeAI(
             message: "Unable to reach Cube AI. Please check your connection and try again.",
             type: "cors",
             retryable: false,
-          });
-          return;
-        }
-        if (errorMsg.includes("AbortError") || errorMsg.includes("aborted")) {
-          callbacks.onError({
-            message: "The request timed out. Cube AI may be busy -- please try again.",
-            type: "timeout",
-            retryable: true,
           });
           return;
         }
@@ -175,8 +191,20 @@ export function streamCubeAI(
       // toolCall payloads arrive consistently.
       let parseFailures = 0;
 
+      // Rolling stall timer — reset on every chunk. If no bytes arrive for
+      // STREAM_STALL_MS the stream is considered hung and we abort.
+      const resetStall = (): void => {
+        if (stallTimer) clearTimeout(stallTimer);
+        stallTimer = setTimeout(() => {
+          stallTimedOut = true;
+          controller.abort();
+        }, STREAM_STALL_MS);
+      };
+      resetStall();
+
       while (true) {
         const { done, value } = await reader.read();
+        resetStall(); // got bytes (or done) — reset stall window
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
@@ -287,9 +315,17 @@ export function streamCubeAI(
       callbacks.onPhaseChange("complete");
       callbacks.onComplete({ content: streamContent, chatId: responseChatId });
     } catch (err) {
-      // Do not report errors if the caller intentionally aborted
-      if (controller.signal.aborted) return;
-
+      if (controller.signal.aborted) {
+        if (timedOut || stallTimedOut) {
+          callbacks.onError({
+            message: "Cube AI took too long to respond. Please try again.",
+            type: "timeout",
+            retryable: true,
+          });
+        }
+        // else: user-initiated stop or component unmount — exit silently
+        return;
+      }
       callbacks.onError({
         message: "Something went wrong. Please try again.",
         type: "unknown",
@@ -297,6 +333,7 @@ export function streamCubeAI(
       });
     } finally {
       clearTimeout(timeout);
+      if (stallTimer) clearTimeout(stallTimer);
     }
   })();
 
