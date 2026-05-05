@@ -35,7 +35,7 @@ export interface TableRenderOptions {
 /** Standard border definition for all table cells. */
 const CELL_BORDER = {
   color: COLORS.TABLE_BORDER,
-  dashStyle: PowerPoint.ShapeLineDashStyle.solid,
+  dashStyle: "Solid" as PowerPoint.ShapeLineDashStyle,
   weight: 1,
 };
 
