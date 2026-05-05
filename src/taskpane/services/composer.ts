@@ -17,7 +17,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { Tool, ToolUseBlock } from "@anthropic-ai/sdk/resources/messages";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { ANTHROPIC_API_KEY, ANTHROPIC_MODEL } from "../config";
-import { COMPOSER_SYSTEM_PROMPT_V1 } from "../prompts/composerSystem";
+import { COMPOSER_SYSTEM_PROMPT_V2 } from "../prompts/composerSystem";
 import { buildUserContent } from "../prompts/composerUser";
 import {
   CompositionPlanSchema,
@@ -35,6 +35,7 @@ export interface ComposerInput {
   };
   rows: unknown[];
   canvas: { widthPx: number; heightPx: number };
+  generatedImageBase64?: string;
   signal?: AbortSignal;
 }
 
@@ -95,7 +96,7 @@ export async function composeSlide(
         system: [
           {
             type: "text",
-            text: COMPOSER_SYSTEM_PROMPT_V1,
+            text: COMPOSER_SYSTEM_PROMPT_V2,
             cache_control: { type: "ephemeral" },
           },
           {

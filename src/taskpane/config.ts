@@ -35,6 +35,10 @@ export const CUBE_DATA_CONFIG = {
   jwt: __CUBE_DATA_JWT__,
 };
 
+// Image generation (nano-banana-pro / Gemini)
+declare const __GEMINI_API_KEY__: string;
+export const GEMINI_API_KEY = __GEMINI_API_KEY__;
+
 // Phase 6 D-14: Load-time credential validation.
 // Setup-required screen (App.tsx, wired in a later wave) renders when any
 // required credential is missing or contains a placeholder string. The helper

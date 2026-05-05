@@ -10,7 +10,7 @@ import { z } from "zod";
 
 export const RegionSchema = z.object({
   id: z.string().min(1),
-  kind: z.enum(["title", "subtitle", "commentary", "chart", "table", "callout"]),
+  kind: z.enum(["title", "subtitle", "commentary", "chart", "table", "callout", "image"]),
   x: z.number().min(0).max(1),
   y: z.number().min(0).max(1),
   w: z.number().min(0).max(1),
@@ -40,7 +40,7 @@ export const TableSpecSchema = z.object({
 
 export const CompositionPlanSchema = z
   .object({
-    layout: z.enum(["chart-only", "split", "stacked", "sidebar", "multi-element"]),
+    layout: z.enum(["chart-only", "split", "stacked", "sidebar", "multi-element", "with-image"]),
     regions: z.array(RegionSchema).min(1).max(6),
     title: z.string().min(1).max(120),
     subtitle: z.string().max(160).optional(),

@@ -66,7 +66,7 @@ export interface ComposedSlideContent {
   commentary: string;
   regions: Array<{
     id: string;
-    kind: "title" | "subtitle" | "commentary" | "chart" | "table" | "callout";
+    kind: "title" | "subtitle" | "commentary" | "chart" | "table" | "callout" | "image";
     /** Fraction [0, 1] of slide width (left edge). */
     x: number;
     /** Fraction [0, 1] of slide height (top edge). */
@@ -98,6 +98,8 @@ export interface ComposedSlideContent {
   };
   /** Optional callout text for callout-kind regions. Absent → callout region skipped. */
   calloutText?: string;
+  /** Base64 PNG (no "data:" prefix) for image-kind regions. Absent → image region skipped. */
+  generatedImageBase64?: string;
 }
 
 /** Discriminated union of all slide content types. */

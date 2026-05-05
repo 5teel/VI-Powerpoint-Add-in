@@ -44,6 +44,8 @@ import type { CubeSqlApiToolCall } from "../services/cubeai";
 import { translateSql } from "../services/sqlTranslator";
 import { loadCubeData } from "../services/cubeDataClient";
 import { composeWithRetry } from "../services/compositionRetry";
+import { evaluateImageNeed } from "../services/imageEvaluator";
+import { generateImage } from "../services/imageGenerator";
 import type { CompositionPlan } from "../services/compositionSchema";
 import { renderVegaToBase64Png } from "../services/vegaRenderer";
 import { insertSlide } from "../services/slideRenderer";
@@ -183,6 +185,9 @@ export const SlidePreview: React.FC<SlidePreviewProps> = ({
   const cubeRowsRef = useRef<unknown[] | null>(null);
   const finalPlanRef = useRef<CompositionPlan | null>(null);
   const chartPngRef = useRef<string | undefined>(undefined);
+  // Image generation cache: false = not yet evaluated, string = base64 or "" = no image
+  const imageEvaluatedRef = useRef<boolean>(false);
+  const generatedImageRef = useRef<string | undefined>(undefined);
 
   // Keep parent's onStageChange in sync with local stage transitions.
   useEffect(() => {
@@ -246,6 +251,28 @@ export const SlidePreview: React.FC<SlidePreviewProps> = ({
         setStage("composing");
         enterStage("composing");
         let finalPlan: CompositionPlan | null = finalPlanRef.current;
+
+        // Image evaluation + generation — runs once per composition, cached for retries.
+        // Silent failure: any error skips the image and proceeds with text-only layout.
+        let generatedImageBase64: string | undefined = generatedImageRef.current;
+        if (!finalPlan && !imageEvaluatedRef.current) {
+          try {
+            const evalResult = await evaluateImageNeed(
+              userQuestion,
+              commentary ?? "",
+              toolCall.input.queryTitle,
+              ac.signal
+            );
+            if (evalResult.needed && evalResult.prompt && !ac.signal.aborted) {
+              generatedImageBase64 = await generateImage(evalResult.prompt, ac.signal);
+              generatedImageRef.current = generatedImageBase64;
+            }
+          } catch {
+            // Image is optional — proceed without it
+          }
+          imageEvaluatedRef.current = true;
+        }
+
         if (!finalPlan) {
           await composeWithRetry(
             {
@@ -263,6 +290,7 @@ export const SlidePreview: React.FC<SlidePreviewProps> = ({
               },
               rows,
               canvas: { widthPx: 960, heightPx: 540 },
+              generatedImageBase64,
               signal: ac.signal,
             },
             {
@@ -309,6 +337,7 @@ export const SlidePreview: React.FC<SlidePreviewProps> = ({
           commentary: plan.commentary,
           regions: plan.regions,
           chartPngBase64,
+          generatedImageBase64,
           tableSpec: buildComposedTableSpec(
             plan,
             rows as Array<Record<string, unknown>>,
@@ -371,6 +400,8 @@ export const SlidePreview: React.FC<SlidePreviewProps> = ({
     cubeRowsRef.current = null;
     finalPlanRef.current = null;
     chartPngRef.current = undefined;
+    imageEvaluatedRef.current = false;
+    generatedImageRef.current = undefined;
     setError(null);
     setPartial({});
     setStageRows(initialStageRows());
@@ -387,6 +418,7 @@ export const SlidePreview: React.FC<SlidePreviewProps> = ({
     // stages keep their cached outputs, so only the failed stage (and what
     // follows) re-runs — Pitfall 4.
     if (stageIdx <= 0) cubeRowsRef.current = null;
+    if (stageIdx <= 0) { imageEvaluatedRef.current = false; generatedImageRef.current = undefined; }
     if (stageIdx <= 1) finalPlanRef.current = null;
     if (stageIdx <= 2) chartPngRef.current = undefined;
     setError(null);

@@ -22,7 +22,7 @@ import type { ComposedSlideContent } from "./types";
 
 export interface Region {
   id: string;
-  kind: "title" | "subtitle" | "commentary" | "chart" | "table" | "callout";
+  kind: "title" | "subtitle" | "commentary" | "chart" | "table" | "callout" | "image";
   x: number;
   y: number;
   w: number;
@@ -122,6 +122,17 @@ export async function renderComposedSlide(content: ComposedSlideContent): Promis
           shape.fill.setImage(content.chartPngBase64);
           shape.lineFormat.weight = 0;
           shape.altTextDescription = content.title;
+          break;
+        }
+        case "image": {
+          if (!content.generatedImageBase64) break;
+          const imgShape = shapes.addGeometricShape(
+            PowerPoint.GeometricShapeType.rectangle,
+            { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
+          );
+          imgShape.fill.setImage(content.generatedImageBase64);
+          imgShape.lineFormat.weight = 0;
+          imgShape.altTextDescription = "AI-generated supporting image";
           break;
         }
         case "table": {

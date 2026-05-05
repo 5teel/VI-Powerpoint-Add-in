@@ -45,12 +45,18 @@ export function buildUserContent(input: ComposerInput): string {
 
   const originalSpec = input.cubeMeta.vegaSpec ?? input.cubeMeta.tableChartSpec ?? {};
 
-  return [
+  const parts = [
     `User question: ${input.userQuestion}`,
     `Cube query title: ${input.cubeMeta.queryTitle}`,
     `Cube description: ${input.cubeMeta.description}`,
     `Cube commentary (source-of-truth narrative): ${commentary}`,
     `Rows (${input.rows.length}${truncated ? ", truncated" : ""}): ${rowsJson}`,
     `Original chart spec: ${JSON.stringify(originalSpec)}`,
-  ].join("\n\n");
+  ];
+  if (input.generatedImageBase64) {
+    parts.push(
+      'Generated image: Available — use layout "with-image" and include a region with kind "image" and id "image" to display it.'
+    );
+  }
+  return parts.join("\n\n");
 }

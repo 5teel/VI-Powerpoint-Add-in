@@ -67,6 +67,7 @@ module.exports = async (env, options) => {
         '__ANTHROPIC_MODEL__': JSON.stringify(process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6'),
         '__CUBE_DATA_BASE_URL__': JSON.stringify(process.env.CUBE_DATA_BASE_URL || ''),
         '__CUBE_DATA_JWT__': JSON.stringify(process.env.CUBE_DATA_JWT || ''),
+        '__GEMINI_API_KEY__': JSON.stringify(process.env.GEMINI_API_KEY || ''),
       }),
       new HtmlWebpackPlugin({
         filename: "taskpane.html",
